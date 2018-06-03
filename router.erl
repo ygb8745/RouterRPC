@@ -50,13 +50,14 @@ handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
                 UnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                  sets:from_list(KnowenNodeList))),
+                log({"UnKnowenNodeList", UnKnowenNodeList}),
                 UnKnowenNodeRestList=
                     case UnKnowenNodeList of
                         []-> %do nothing
                             [];
                         _ ->
-                            {RestList, _todo_BadNodes} = rpc:multicall(gen_server, call, [router,
-                                                                            {update_router_request, UnKnowenNodeList, Ref}]),
+                            {RestList, _todo_BadNodes} = rpc:multicall(UnKnowenNodeList, gen_server, call, [router,
+                                                                            {update_router_request, KnowenNodeList ++ UnKnowenNodeList, Ref}]),
                             RestList
                     end,
                 [{node(), nodes()} | UnKnowenNodeRestList];
@@ -110,3 +111,5 @@ code_change(_OldVsn, State, _Extra)-> {ok, State}.
 
 log(What)->
     io:format("Log who:~p-~p, ~nwhat:~p~n",[node(), self(), What]).
+
+% todo,在每个节点上都启动router进程
