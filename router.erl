@@ -8,6 +8,10 @@
 
 -define(undef, undefined).
 
+-record(?MODULE,{
+    % all_known_nodes = sets:new(),
+    reouter_items = #{} % 每条记录是: 节点名-> [该节点可达的节点列表]
+}).
 
 start() -> start_link().
 start_link() ->
@@ -20,7 +24,7 @@ start_link() ->
 %     gen_server:cast(router, {free, Ch}).
 
 init(_Args) ->
-    {ok, [node()|nodes()]}.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
+    {ok, #?MODULE{} }.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
 
 stop() ->
     gen_server:cast(router, stop).
@@ -31,6 +35,12 @@ terminate(normal, _State) ->
 update_router()->
     gen_server:cast(router, update_router_start).
 
+whow()->
+    log({"Show route tab:",
+        gen_server:call(router, get_all_router_items)}).
+
+handle_call(get_all_router_items, _From, State) ->
+    {reply, State#?MODULE.reouter_items, State};
 handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
     log({handle_call, {update_router_request, KnowenNodeList, Ref}}),
     Reply =
@@ -77,14 +87,18 @@ handle_cast(update_router_start, State) ->
     end),
     {noreply, State};
 handle_cast({update_router_done, FlattenList}, State) ->
-    lists:foreach(
-                fun({NodeName, ConnectiongList})->
-                    % 放在进程字典中的路由信息是  {router_item, 节点名} -> [该节点可达的节点列表]
-                    io:format("router item: ~p -> ~p~n",[{router_item, NodeName}, ConnectiongList]),
-                    put({router_item, NodeName}, ConnectiongList)
-                end,
-                FlattenList),
-    {noreply, State};
+    OldRouterMap = State#?MODULE.reouter_items,
+    NewRouterMap =
+        lists:foldl(
+                    fun({NodeName, ConnectiongList}, RouterMap)->
+                        % 放在进程字典中的路由信息是  {router_item, 节点名} -> [该节点可达的节点列表]
+                        log({"router item",[{NodeName}, "->", ConnectiongList]}),
+                        % put({router_item, NodeName}, ConnectiongList)
+                        RouterMap#{NodeName => ConnectiongList}
+                    end,
+                    OldRouterMap,
+                    FlattenList),
+    {noreply, State#?MODULE{reouter_items = NewRouterMap}};
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Request, OldState) ->
