@@ -10,7 +10,8 @@
 
 -record(?MODULE,{
     % all_known_nodes = sets:new(),
-    reouter_items = #{} % 每条记录是: 节点名-> [该节点可达的节点列表]
+    reouter_items = #{}, % 每条记录是: 节点名-> [该节点可达的节点列表]
+    path_to_other = #{}  % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
 }).
 
 start() -> start_link().
@@ -35,7 +36,7 @@ terminate(normal, _State) ->
 update_router()->
     gen_server:cast(router, update_router_start).
 
-path_rpc(Path,M,F,A)->
+rpc_call(Path,M,F,A) when is_list(Path)->
     [Target|PathrLeft] = lists:reverse(Path),
     ArgList = lists:foldr(
         fun(N,Acc) ->
@@ -44,12 +45,21 @@ path_rpc(Path,M,F,A)->
         [Target,M,F,A],
         PathrLeft
     ),
-    erlang:apply(rpc, call, ArgList).
+    erlang:apply(rpc, call, ArgList);
+rpc_call(Node,M,F,A)->
+    case maps:find(Node, gen_server:call(router, get_path_to_other)) of
+        {ok, Path}->
+            rpc_call(Path, M, F, A);
+        error ->
+            {error, node_not_found}
+    end.
 
-whow()->
-    log({"Show route tab:",
-        gen_server:call(router, get_all_router_items)}).
+show()->
+    log({"Show route tab:", gen_server:call(router, get_all_router_items),
+        "Path to other:", gen_server:call(router, get_path_to_other)}).
 
+handle_call(get_path_to_other, _From, State) ->
+    {reply, State#?MODULE.path_to_other, State};
 handle_call(get_all_router_items, _From, State) ->
     {reply, State#?MODULE.reouter_items, State};
 handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
@@ -114,7 +124,10 @@ handle_cast({update_router_done, FlattenList}, State) ->
                     end,
                     OldRouterMap,
                     FlattenList),
-    {noreply, State#?MODULE{reouter_items = NewRouterMap}};
+    PathMap = find_path_for_all(NewRouterMap),
+    {noreply, State#?MODULE{
+        reouter_items = NewRouterMap,
+        path_to_other = PathMap}};
 handle_cast({del_ref, Ref}, State) ->
     erase(Ref),
     {noreply, State};
@@ -127,7 +140,36 @@ handle_cast(_Request, OldState) ->
 handle_info(_Info,State)-> {noreply, State}.
 code_change(_OldVsn, State, _Extra)-> {ok, State}.
 
+find_path_for_all(RouterMap)->
+    Nodes = nodes(),
+    PathMap = lists:foldl(
+        fun(N,Acc)->
+            Acc#{N => [N]}
+        end,
+        #{},
+        Nodes),
+    find_path_for_all_help(RouterMap, PathMap#{node() => [node()]}, queue:from_list(Nodes)).
+
+find_path_for_all_help(RouterMap, PathMap, Queue)->
+    case queue:out(Queue) of
+        {{value, Item}, NewQueue} ->
+            NodesConnToThis = maps:get(Item, RouterMap),
+            NewPathMap =
+                lists:foldl(
+                    fun(N,Acc)->
+                        case maps:is_key(N, Acc) of
+                            true-> Acc;
+                            false-> PathMap#{N => maps:get(Item, PathMap) ++ [N]}
+                        end
+                    end,
+                    PathMap,
+                    NodesConnToThis),
+            find_path_for_all_help(RouterMap, NewPathMap, NewQueue);
+        {empty, _} ->
+            PathMap
+    end.
+
 log(What)->
-    io:format("Log who:~p-~p, ~nwhat:~p~n",[node(), self(), What]).
+    io:format("Log-who:~p-~p\t what:~p~n",[node(), self(), What]).
 
 % todo,在每个节点上都启动router进程
