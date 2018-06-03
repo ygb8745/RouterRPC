@@ -35,6 +35,17 @@ terminate(normal, _State) ->
 update_router()->
     gen_server:cast(router, update_router_start).
 
+path_rpc(Path,M,F,A)->
+    [Target|PathrLeft] = lists:reverse(Path),
+    ArgList = lists:foldr(
+        fun(N,Acc) ->
+            [N,rpc,call,Acc]
+        end,
+        [Target,M,F,A],
+        PathrLeft
+    ),
+    erlang:apply(rpc, call, ArgList).
+
 whow()->
     log({"Show route tab:",
         gen_server:call(router, get_all_router_items)}).
@@ -47,6 +58,10 @@ handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
         case get(Ref) of
             ?undef ->
                 put(Ref, update_router_start),% todo 删除Ref
+                spawn(fun()->
+                    timer:sleep(100*1000),%100s
+                    gen_server:cast(router,{del_ref, Ref})
+                end),
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
                 UnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                  sets:from_list(KnowenNodeList))),
@@ -100,6 +115,9 @@ handle_cast({update_router_done, FlattenList}, State) ->
                     OldRouterMap,
                     FlattenList),
     {noreply, State#?MODULE{reouter_items = NewRouterMap}};
+handle_cast({del_ref, Ref}, State) ->
+    erase(Ref),
+    {noreply, State};
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Request, OldState) ->
