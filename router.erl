@@ -7,6 +7,25 @@
 -compile(export_all).
 
 -define(undef, undefined).
+-define(log(What),
+            io:format(
+                "=> ~p~n"
+                "\t\t\t\t from: N:~p P:~p M:~p L:~p T:~p~n",[What, node(), self(), ?MODULE,?LINE,format_timestamp()])).
+format_timestamp() ->
+    TS = {_,_,Micro} = os:timestamp(),
+    {{Year,Month,Day},{Hour,Minute,Second}} =
+        %calendar:now_to_universal_time(TS),
+        calendar:local_time(),
+    Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul",
+              "Aug","Sep","Oct","Nov","Dec"}),
+    % io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
+    %       [Day,Mstr,Year,Hour,Minute,Second,Micro]).
+    % List = [Hour,Minute,Second,Micro],
+    % list_to_atom(lists:join($-,List)).
+    % Str = io_lib:format("~p-~p-~p-~p",
+    %                [Hour,Minute,Second,Micro]),
+    % list_to_atom(Str).
+    ok.
 
 -record(?MODULE,{
     % all_known_nodes = sets:new(),
@@ -55,7 +74,7 @@ rpc_call(Node,M,F,A)->
     end.
 
 show()->
-    log({"Show route tab:", gen_server:call(router, get_all_router_items),
+    ?log({"Show route tab:", gen_server:call(router, get_all_router_items),
         "Path to other:", gen_server:call(router, get_path_to_other)}).
 
 handle_call(get_path_to_other, _From, State) ->
@@ -63,19 +82,19 @@ handle_call(get_path_to_other, _From, State) ->
 handle_call(get_all_router_items, _From, State) ->
     {reply, State#?MODULE.reouter_items, State};
 handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
-    log({handle_call, {update_router_request, KnowenNodeList, Ref}}),
+    ?log({handle_call, {update_router_request, KnowenNodeList, Ref}}),
     Reply =
         case get(Ref) of
             ?undef ->
-                put(Ref, update_router_start),% todo 删除Ref
+                put(Ref, update_router_start),
                 spawn(fun()->
-                    timer:sleep(100*1000),%100s
-                    gen_server:cast(router,{del_ref, Ref})
-                end),
+                        timer:sleep(100*1000),%100s
+                        gen_server:cast(router,{del_ref, Ref})
+                      end),
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
                 UnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
-                                                 sets:from_list(KnowenNodeList))),
-                log({"UnKnowenNodeList", UnKnowenNodeList}),
+                                                              sets:from_list(KnowenNodeList))),
+                ?log({"UnKnowenNodeList", UnKnowenNodeList}),
                 UnKnowenNodeRestList=
                     case UnKnowenNodeList of
                         []-> %do nothing
@@ -91,7 +110,7 @@ handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
         end,
     {reply, Reply, State};
 handle_call(Request, _From, OldState) ->
-    log({"router.unhandle_call:~p~n",[{Request, _From, OldState}]}),
+    ?log({"router.unhandle_call:~p~n",[{Request, _From, OldState}]}),
     {reply, Request, OldState}. %{reply, Reply, State1}。Reply是需要回馈给客户端的答复，同时 State1 是gen_server的状态的新值。
 
 handle_cast(update_router_start, State) ->
@@ -118,7 +137,7 @@ handle_cast({update_router_done, FlattenList}, State) ->
         lists:foldl(
                     fun({NodeName, ConnectiongList}, RouterMap)->
                         % 放在进程字典中的路由信息是  {router_item, 节点名} -> [该节点可达的节点列表]
-                        log({"router item",[{NodeName}, "->", ConnectiongList]}),
+                        ?log({"router item",[{NodeName}, "->", ConnectiongList]}),
                         % put({router_item, NodeName}, ConnectiongList)
                         RouterMap#{NodeName => ConnectiongList}
                     end,
@@ -134,7 +153,7 @@ handle_cast({del_ref, Ref}, State) ->
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Request, OldState) ->
-    log({"router.unhandle_call:~p~n",[{_Request, OldState}]}),
+    ?log({"router.unhandle_call:~p~n",[{_Request, OldState}]}),
     {noreply, OldState}.
 
 handle_info(_Info,State)-> {noreply, State}.
@@ -169,7 +188,7 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
             PathMap
     end.
 
-log(What)->
-    io:format("Log-who:~p-~p\t what:~p~n",[node(), self(), What]).
 
-% todo,在每个节点上都启动router进程
+% todo
+% 在每个节点上都启动router进程
+% badrpc 问题.
