@@ -6,7 +6,8 @@
 % -export([init/1, handle_call/3, handle_cast/2]).
 -compile(export_all).
 
--define(undef, undefined).
+-define(DEBUG, true).
+-ifdef(DEBUG).
 -define(log(What),
             io:format(
                 "=> ~p~n"
@@ -17,6 +18,11 @@ format_timestamp() ->
         calendar:local_time(),
      io_lib:format("~p:~p:~p.~p",
                     [Hour,Minute,Second,Micro]).
+-else.
+-define(log(What), void).
+-endif.
+
+-define(undef, undefined).
 
 -record(?MODULE,{
     % all_known_nodes = sets:new(),
