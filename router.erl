@@ -137,6 +137,7 @@ handle_cast(update_router_start, State) ->
     end),
     {noreply, State};
 handle_cast({update_router_done, RouterList}, State) ->
+    % RouterList的结构是[{节点名,[该节点连接的节点列表]}]
     OldRouterMap = State#?MODULE.reouter_items,
     NewRouterMap =
         lists:foldl(
@@ -193,6 +194,15 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
             PathMap
     end.
 
+% doc
+% 路由算法:
+%   这里面设计了两套路由逻辑:
+%       1.某节点主动向全网发起请求,以获得全网的拓扑.
+%           这个的过程是,本节点调用cast(update_router_start 开始本过程
+%           向全网节点发出call({update_router_request, KnowenNodeList, Ref}
+%           全网的节点都回答后本节点的gen_server会收到:handle_cast({update_router_done, RouterList}
+%       2.todo 每个节点都会在随机时间后尝试向所有已知节点发出ping请求连接,并向周围直连节点发出自己的路由表,
+%         周围节点收到路由表后开始更新自己的路由表.
 % todo
 % 在每个节点上都启动router进程
 % 改进路由算法.
