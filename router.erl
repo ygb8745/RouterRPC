@@ -71,7 +71,8 @@ rpc_call(Node,M,F,A)->
     end.
 
 show()->
-    ?log({"Show route tab:", gen_server:call(router, get_all_router_items),
+    ?log({"This Node:",node(),
+        "Route tab:", gen_server:call(router, get_all_router_items),
         "Path to other:", gen_server:call(router, get_path_to_other)}).
 
 handle_call(get_path_to_other, _From, State) ->
@@ -115,9 +116,6 @@ handle_cast(update_router_start, State) ->
         Ref = erlang:make_ref(),
         % 每个节点的路由条目是: {节点名, [该节点可达的节点列表]}
         % 每个节点返回的路由信息应该是 [本节点路由条目, 其他节点路由条目]
-        % multicall包括本节点.
-        % gen_server循环call的问题.
-        % 拼写错误 gen_server  sen_server.
         {RestList, _todo_BadNodes} = rpc:multicall(gen_server, call, [router,
                                                                         {update_router_request,
                                                                         _KnowenNodeList = [node()|nodes()],
@@ -143,9 +141,8 @@ handle_cast({update_router_done, RouterList}, State) ->
     NewRouterMap =
         lists:foldl(
                     fun({NodeName, ConnectiongList}, RouterMap)->
-                        % 放在进程字典中的路由信息是  {router_item, 节点名} -> [该节点可达的节点列表]
-                        ?log({"router item",[{NodeName}, "->", ConnectiongList]}),
-                        % put({router_item, NodeName}, ConnectiongList)
+                        % 路由信息是  节点名 => [该节点可达的节点列表]
+                        ?log({"router item:",[NodeName, "->", ConnectiongList]}),
                         RouterMap#{NodeName => ConnectiongList}
                     end,
                     OldRouterMap,
