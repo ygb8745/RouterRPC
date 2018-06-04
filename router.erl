@@ -61,7 +61,7 @@ rpc_call(Node,M,F,A)->
         {ok, Path}->
             rpc_call(Path, M, F, A);
         error ->
-            {error, node_not_found}
+            {error, node_not_found, Node}
     end.
 
 show()->
@@ -107,7 +107,6 @@ handle_call(Request, _From, OldState) ->
 handle_cast(update_router_start, State) ->
     spawn(fun()->
         Ref = erlang:make_ref(),
-        % put(Ref, update_router_start),
         % 每个节点的路由条目是: {节点名, [该节点可达的节点列表]}
         % 每个节点返回的路由信息应该是 [本节点路由条目, 其他节点路由条目]
         % multicall包括本节点.
@@ -117,12 +116,23 @@ handle_cast(update_router_start, State) ->
                                                                         {update_router_request,
                                                                         _KnowenNodeList = [node()|nodes()],
                                                                         Ref}]),
-        % todo 处理{badrpc, Why}
         FlattenList = lists:flatten(RestList),
-        gen_server:cast(router,{update_router_done, FlattenList})
+        RouterList = lists:foldl(
+            fun(I, Acc)->
+                case I of
+                    {badrpc, Why} ->
+                        ?log({badrpc, Why});
+                    GoodItem ->
+                        [GoodItem | Acc]
+                end
+            end,
+            [],
+            FlattenList
+        ),
+        gen_server:cast(router,{update_router_done, RouterList})
     end),
     {noreply, State};
-handle_cast({update_router_done, FlattenList}, State) ->
+handle_cast({update_router_done, RouterList}, State) ->
     OldRouterMap = State#?MODULE.reouter_items,
     NewRouterMap =
         lists:foldl(
@@ -133,7 +143,7 @@ handle_cast({update_router_done, FlattenList}, State) ->
                         RouterMap#{NodeName => ConnectiongList}
                     end,
                     OldRouterMap,
-                    FlattenList),
+                    RouterList),
     PathMap = find_path_for_all(NewRouterMap),
     ?log("router update done"),
     {noreply, State#?MODULE{
@@ -180,7 +190,6 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
             PathMap
     end.
 
-
 % todo
 % 在每个节点上都启动router进程
-% badrpc 问题.
+% 改进路由算法.
