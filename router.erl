@@ -135,6 +135,7 @@ handle_cast({update_router_done, FlattenList}, State) ->
                     OldRouterMap,
                     FlattenList),
     PathMap = find_path_for_all(NewRouterMap),
+    ?log("router update done"),
     {noreply, State#?MODULE{
         reouter_items = NewRouterMap,
         path_to_other = PathMap}};
