@@ -30,6 +30,15 @@ format_timestamp() ->
     path_to_other = #{}  % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
 }).
 
+% 用法 用于作为router_map的一项: node() => #router_item{}
+% -type router_map() = #{node_name() => #router_item{}}.
+% -type path_map() =   #{node_name() => [_Path_to_this_node = node_name()]}.
+% -type node_name() = atom().
+-record(router_item,{
+    connected_list, % [直连节点列表]
+    timestamp % 最后更新该项的时间戳
+}).
+
 start() -> start_link().
 start_link() ->
     gen_server:start_link({local, router},%本地注册为router ,也可以通过whereis()函数来获得pid.
@@ -80,8 +89,9 @@ handle_call(get_path_to_other, _From, State) ->
 handle_call(get_all_router_items, _From, State) ->
     {reply, State#?MODULE.reouter_items, State};
 handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
-    ?log({handle_call, {update_router_request, KnowenNodeList, Ref}}),
-    Reply =
+    % KnowenNodeList :: [已知节点]
+    ?log({update_router_request, KnowenNodeList, Ref}),
+    RouterMap =
         case get(Ref) of
             ?undef ->
                 put(Ref, update_router_start),
@@ -90,23 +100,35 @@ handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
                         gen_server:cast(router,{del_ref, Ref})
                       end),
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
-                UnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
+                SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                               sets:from_list(KnowenNodeList))),
-                ?log({"UnKnowenNodeList", UnKnowenNodeList}),
-                UnKnowenNodeRestList=
-                    case UnKnowenNodeList of
+                ?log({"SysUnKnowenNodeList", SysUnKnowenNodeList}),
+                SysUnKnowenNodeRouterMap=
+                    case SysUnKnowenNodeList of
                         []-> %do nothing
-                            [];
+                            #{};
                         _ ->
-                            {RestList, _todo_BadNodes} = rpc:multicall(UnKnowenNodeList, gen_server, call, [router,
-                                                                            {update_router_request, KnowenNodeList ++ UnKnowenNodeList, Ref}]),
-                            RestList
+                            {RouterMapList, _todo_BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
+                                            [router, {update_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
+                            lists:foldl(
+                                fun(I, Acc)->
+                                    ?log({"I:",I}),
+                                    case I of
+                                        {badrpc, _Why} = BadAns ->
+                                            ?log(BadAns),
+                                            Acc;
+                                        GoodAns ->
+                                            maps:merge(GoodAns,Acc)
+                                    end
+                                end, #{}, RouterMapList)
                     end,
-                [{node(), nodes()} | UnKnowenNodeRestList];
+                maps:merge(#{node() => #router_item{connected_list = nodes(),
+                                                    timestamp = os:timestamp()} },
+                           SysUnKnowenNodeRouterMap);
             _ ->
-            [] % ignore 已经处理过这个router请求了
+                #{} % ignore 已经处理过这个router请求了
         end,
-    {reply, Reply, State};
+    {reply, RouterMap, State};
 handle_call(Request, _From, OldState) ->
     ?log({"router.unhandle_call:~p~n",[{Request, _From, OldState}]}),
     {reply, Request, OldState}. %{reply, Reply, State1}。Reply是需要回馈给客户端的答复，同时 State1 是gen_server的状态的新值。
@@ -116,43 +138,27 @@ handle_cast(update_router_start, State) ->
         Ref = erlang:make_ref(),
         % 每个节点的路由条目是: {节点名, [该节点可达的节点列表]}
         % 每个节点返回的路由信息应该是 [本节点路由条目, 其他节点路由条目]
-        {RestList, _todo_BadNodes} = rpc:multicall(gen_server, call, [router,
+        {RouterMapList, _todo_BadNodes} = rpc:multicall(gen_server, call, [router,
                                                                         {update_router_request,
                                                                         _KnowenNodeList = [node()|nodes()],
                                                                         Ref}]),
-        FlattenList = lists:flatten(RestList),
-        RouterList = lists:foldl(
-            fun(I, Acc)->
-                case I of
-                    {badrpc, Why} ->
-                        ?log({badrpc, Why});
-                    GoodItem ->
-                        [GoodItem | Acc]
-                end
-            end,
-            [],
-            FlattenList
-        ),
-        gen_server:cast(router,{update_router_done, RouterList})
+        RouterMap = lists:foldl(
+                        fun(I, Acc)->
+                            case I of
+                                {badrpc, _Why} = BadAns ->
+                                    ?log(BadAns),
+                                    Acc;
+                                GoodAns ->
+                                    maps:merge(GoodAns,Acc)
+                            end
+                        end, #{}, RouterMapList),
+        gen_server:cast(router,{update_router_done, RouterMap})
     end),
     {noreply, State};
-handle_cast({update_router_done, RouterList}, State) ->
-    % RouterList的结构是[{节点名,[该节点连接的节点列表]}]
-    OldRouterMap = State#?MODULE.reouter_items,
-    NewRouterMap =
-        lists:foldl(
-                    fun({NodeName, ConnectiongList}, RouterMap)->
-                        % 路由信息是  节点名 => [该节点可达的节点列表]
-                        ?log({"router item:",[NodeName, "->", ConnectiongList]}),
-                        RouterMap#{NodeName => ConnectiongList}
-                    end,
-                    OldRouterMap,
-                    RouterList),
-    PathMap = find_path_for_all(NewRouterMap),
+handle_cast({update_router_done, RouterMap}, State) ->
     ?log("router update done"),
-    {noreply, State#?MODULE{
-        reouter_items = NewRouterMap,
-        path_to_other = PathMap}};
+    NewState = update_router_info(State, RouterMap),
+    {noreply, NewState};
 handle_cast({del_ref, Ref}, State) ->
     erase(Ref),
     {noreply, State};
@@ -165,20 +171,28 @@ handle_cast(_Request, OldState) ->
 handle_info(_Info,State)-> {noreply, State}.
 code_change(_OldVsn, State, _Extra)-> {ok, State}.
 
+update_router_info(State, NewRouterMap)-> % NewState
+    OldRouterMap = State#?MODULE.reouter_items,
+    NewRouterMap = maps:merge(NewRouterMap, OldRouterMap),
+    ?log({"update_router_info new:",NewRouterMap}),
+    PathMap = find_path_for_all(NewRouterMap),
+    State#?MODULE{reouter_items = NewRouterMap,
+                  path_to_other = PathMap}.
+
 find_path_for_all(RouterMap)->
     Nodes = nodes(),
     PathMap = lists:foldl(
         fun(N,Acc)->
             Acc#{N => [N]}
-        end,
-        #{},
-        Nodes),
-    find_path_for_all_help(RouterMap, PathMap#{node() => [node()]}, queue:from_list(Nodes)).
+        end, #{}, Nodes),
+    find_path_for_all_help(RouterMap,
+                           PathMap#{node() => nodes()},
+                           queue:from_list(Nodes)).
 
 find_path_for_all_help(RouterMap, PathMap, Queue)->
     case queue:out(Queue) of
         {{value, Item}, NewQueue} ->
-            NodesConnToThis = maps:get(Item, RouterMap),
+            #router_item{connected_list = NodesConnToThis} = maps:get(Item, RouterMap),
             NewPathMap =
                 lists:foldl(
                     fun(N,Acc)->
@@ -186,9 +200,7 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
                             true-> Acc;
                             false-> PathMap#{N => maps:get(Item, PathMap) ++ [N]}
                         end
-                    end,
-                    PathMap,
-                    NodesConnToThis),
+                    end, PathMap, NodesConnToThis),
             find_path_for_all_help(RouterMap, NewPathMap, NewQueue);
         {empty, _} ->
             PathMap
@@ -203,6 +215,7 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 %           全网的节点都回答后本节点的gen_server会收到:handle_cast({update_router_done, RouterList}
 %       2.todo 每个节点都会在随机时间后尝试向所有已知节点发出ping请求连接,并向周围直连节点发出自己的路由表,
 %         周围节点收到路由表后开始更新自己的路由表.
+%           为了实现这一点,我们要在每个路由表项上加上一个时间戳来判断要不要更新路由表.
 % todo
 % 在每个节点上都启动router进程
 % 改进路由算法.
