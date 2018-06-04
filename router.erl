@@ -10,22 +10,13 @@
 -define(log(What),
             io:format(
                 "=> ~p~n"
-                "\t\t\t\t from: N:~p P:~p M:~p L:~p T:~p~n",[What, node(), self(), ?MODULE,?LINE,format_timestamp()])).
+                "\t\t\t\t from: N:~p P:~p M:~p L:~p T:~s~n",[What, node(), self(), ?MODULE,?LINE,format_timestamp()])).
 format_timestamp() ->
-    TS = {_,_,Micro} = os:timestamp(),
-    {{Year,Month,Day},{Hour,Minute,Second}} =
-        %calendar:now_to_universal_time(TS),
+    {_,_,Micro} = os:timestamp(),
+    {{_Year,_Month,_Day},{Hour,Minute,Second}} =
         calendar:local_time(),
-    Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul",
-              "Aug","Sep","Oct","Nov","Dec"}),
-    % io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
-    %       [Day,Mstr,Year,Hour,Minute,Second,Micro]).
-    % List = [Hour,Minute,Second,Micro],
-    % list_to_atom(lists:join($-,List)).
-    % Str = io_lib:format("~p-~p-~p-~p",
-    %                [Hour,Minute,Second,Micro]),
-    % list_to_atom(Str).
-    ok.
+     io_lib:format("~p:~p:~p.~p",
+                    [Hour,Minute,Second,Micro]).
 
 -record(?MODULE,{
     % all_known_nodes = sets:new(),
