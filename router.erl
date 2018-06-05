@@ -25,9 +25,9 @@ format_timestamp() ->
 -define(undef, undefined).
 
 -record(router_state,{
-    % all_known_nodes = sets:new(),
     reouter_items = #{}, % 每条记录是: 节点名-> [该节点可达的节点列表]
     path_to_other = #{}  % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
+                         % 这个map下所有作为key的node()就是全部的已知节点.
 }).
 
 % 用法 用于作为router_map的一项: node() => #router_item{}
@@ -135,6 +135,7 @@ handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
             _ ->
                 #{} % ignore 已经处理过这个router请求了
         end,
+    update_router_info(State, RouterMap),% todo save info.
     {reply, RouterMap, State};
 handle_call(Request, _From, OldState) ->
     ?log({"router.unhandle_call:~p~n",[{Request, _From, OldState}]}),
@@ -161,12 +162,12 @@ code_change(_OldVsn, State, _Extra)-> {ok, State}.
 
 update_router_info(State, NewRouterMap)-> % NewState
     OldRouterMap = State#router_state.reouter_items,
-    % TODO : 按照时间戳来决定merge的结果.
+    % TODO : 按照时间戳来决定merge的结果. 是否有新的路由信息加入,有的话还要更新path信息
     NewRouterMap = maps:merge(NewRouterMap, OldRouterMap),
     ?log({"update_router_info new:",NewRouterMap}),
     PathMap = find_path_for_all(NewRouterMap),
     State#router_state{reouter_items = NewRouterMap,
-                  path_to_other = PathMap}.
+                       path_to_other = PathMap}.
 
 find_path_for_all(RouterMap)->
     Nodes = [node()|nodes()],
@@ -179,17 +180,23 @@ find_path_for_all(RouterMap)->
 find_path_for_all_help(RouterMap, PathMap, Queue)->
     case queue:out(Queue) of
         {{value, Item}, TQueue} ->
-            #router_item{connected_list = NodesConnToThis} = maps:get(Item, RouterMap),
             {NewPathMap,NewQueue} =
-                lists:foldl(
-                    fun(N,{AccPathMap,AccQueue})->
-                        case maps:is_key(N, AccPathMap) of
-                            true-> {AccPathMap,AccQueue}; % N 节点已经在PathMap中了
-                            false->
-                                {AccPathMap#{N => maps:get(Item, PathMap) ++ [N]},
-                                 queue:in(N, AccQueue)}
-                        end
-                    end, {PathMap,TQueue}, NodesConnToThis),
+                case maps:find(Item, RouterMap) of
+                    {ok, #router_item{connected_list = NodeListConnToThis}} ->
+                        lists:foldl(
+                            fun(N,{AccPathMap,AccQueue})->
+                                case maps:is_key(N, AccPathMap) of
+                                    true->
+                                        {AccPathMap,AccQueue}; % N 节点已经在PathMap中了
+                                    false->
+                                        {AccPathMap#{N => maps:get(Item, PathMap) ++ [N]}, queue:in(N, AccQueue)}
+                                end
+                            end, {PathMap,TQueue}, NodeListConnToThis);
+                    error ->
+                        % 没有该节点的直连节点列表信息,不能通过此节点向外扩展.
+                        ?log({"Router Item not found: node", Item}),
+                        {PathMap,TQueue}
+                end,
             find_path_for_all_help(RouterMap, NewPathMap, NewQueue);
         {empty, _} ->
             PathMap
