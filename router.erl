@@ -186,7 +186,7 @@ find_path_for_all(RouterMap)->
             Acc#{N => [N]}
         end, #{}, Nodes),
     find_path_for_all_help(RouterMap,
-                           PathMap#{node() => nodes()},
+                           PathMap#{node() => node()},
                            queue:from_list(Nodes)).
 
 find_path_for_all_help(RouterMap, PathMap, Queue)->
