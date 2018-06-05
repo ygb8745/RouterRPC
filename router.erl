@@ -103,28 +103,19 @@ handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
                 SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                               sets:from_list(KnowenNodeList))),
                 ?log({"SysUnKnowenNodeList", SysUnKnowenNodeList}),
-                SysUnKnowenNodeRouterMap=
+                SysUnKnowenNodeRouterMapList=
                     case SysUnKnowenNodeList of
                         []-> %do nothing
-                            #{};
+                            [];
                         _ ->
                             {RouterMapList, _todo_BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
                                             [router, {update_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
-                            lists:foldl(
-                                fun(I, Acc)->
-                                    ?log({"I:",I}),
-                                    case I of
-                                        {badrpc, _Why} = BadAns ->
-                                            ?log(BadAns),
-                                            Acc;
-                                        GoodAns ->
-                                            maps:merge(GoodAns,Acc)
-                                    end
-                                end, #{}, RouterMapList)
+                            RouterMapList
                     end,
-                maps:merge(#{node() => #router_item{connected_list = nodes(),
-                                                    timestamp = os:timestamp()} },
-                           SysUnKnowenNodeRouterMap);
+                handle_router_map_list_result(
+                                #{node() => #router_item{connected_list = nodes(),
+                                                        timestamp = os:timestamp()} }, %本节点直连点.
+                                SysUnKnowenNodeRouterMapList);
             _ ->
                 #{} % ignore 已经处理过这个router请求了
         end,
@@ -138,20 +129,14 @@ handle_cast(update_router_start, State) ->
         Ref = erlang:make_ref(),
         % 每个节点的路由条目是: {节点名, [该节点可达的节点列表]}
         % 每个节点返回的路由信息应该是 [本节点路由条目, 其他节点路由条目]
-        {RouterMapList, _todo_BadNodes} = rpc:multicall(gen_server, call, [router,
+        {RouterMapList, _todo_BadNodes} = rpc:multicall(nodes(), gen_server, call, [router,
                                                                         {update_router_request,
                                                                         _KnowenNodeList = [node()|nodes()],
                                                                         Ref}]),
-        RouterMap = lists:foldl(
-                        fun(I, Acc)->
-                            case I of
-                                {badrpc, _Why} = BadAns ->
-                                    ?log(BadAns),
-                                    Acc;
-                                GoodAns ->
-                                    maps:merge(GoodAns,Acc)
-                            end
-                        end, #{}, RouterMapList),
+        RouterMap = handle_router_map_list_result(
+                        #{node() => #router_item{connected_list = nodes(),
+                                                timestamp = os:timestamp()} }, %本节点直连点.
+                        RouterMapList),
         gen_server:cast(router,{update_router_done, RouterMap})
     end),
     {noreply, State};
@@ -178,6 +163,22 @@ update_router_info(State, NewRouterMap)-> % NewState
     PathMap = find_path_for_all(NewRouterMap),
     State#?MODULE{reouter_items = NewRouterMap,
                   path_to_other = PathMap}.
+
+% 将RouterMapList中的RouterMap和本节点的RouteMap合成一个总的RouterMap
+handle_router_map_list_result(RouteMap, RouterMapList)-> % NewRouterMap
+    lists:foldl(
+        fun(I, Acc)->
+            ?log({"I:", I}),
+            case I of
+                RouterMap when is_map(RouterMap) ->
+                    maps:merge(RouterMap, Acc);
+                BadItem ->
+                    ?log({"BadItem:",BadItem}),
+                    Acc
+            end
+        end,
+        RouteMap,
+        RouterMapList).
 
 find_path_for_all(RouterMap)->
     Nodes = nodes(),
