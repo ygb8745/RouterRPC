@@ -8,10 +8,11 @@
 
 -define(DEBUG, true).
 -ifdef(DEBUG).
+%todo 带有优先级的log
 -define(log(What),
             io:format(
                 "=> ~p~n"
-                "\t\t\t\t from: N:~p P:~p M:~p L:~p T:~s~n",[What, node(), self(), ?MODULE,?LINE,format_timestamp()])).
+                "\t\t\t\t log: N:~p P:~p M:~p L:~p T:~s~n",[What, node(), self(), ?MODULE,?LINE,format_timestamp()])).
 format_timestamp() ->
     {_,_,Micro} = os:timestamp(),
     {{_Year,_Month,_Day},{Hour,Minute,Second}} =
@@ -209,9 +210,15 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 %           这个的过程是,本节点调用update_router()向本节点发出call({update_router_request, KnowenNodeList, Ref} 开始本过程
 %           向全网其他节点发出call({update_router_request, KnowenNodeList, Ref}
 %           全网的节点都回答收集的路由信息汇总到update_router()然后调用gen_server:cast(router, {update_router_info,RouterMap})更新本节点的信息.
+%           --有一定的死锁风险,当两个节点同时call对方时就会产生死锁.
 %       2.todo 每个节点都会在随机时间后尝试向所有已知节点发出ping请求连接,并向周围直连节点发出自己的路由表,
 %         周围节点收到路由表后开始更新自己的路由表.
 %           为了实现这一点,我们要在每个路由表项上加上一个时间戳来判断要不要更新路由表.
+%       目前和路由先相关的主要有4个函数:
+%           update_router()
+%           handle_call({update_router_request, KnowenNodeList, Ref}, _From, State)
+%           handle_cast({update_router_info,RouterMap}, State)
+%           update_router_info(State, NewRouterMap)
 % todo
 % 在每个节点上都启动router进程
 % 改进路由算法.
