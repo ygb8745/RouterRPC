@@ -39,6 +39,11 @@ format_timestamp() ->
     timestamp % 最后更新该项的时间戳
 }).
 
+%% ============================================================================================
+%% API Function
+%% ============================================================================================
+%     gen_server:call(router, alloc).
+%     gen_server:cast(router, {free, Ch}).
 start() -> start_link().
 start_link() ->
     gen_server:start_link({local, router},%本地注册为router ,也可以通过whereis()函数来获得pid.
@@ -46,17 +51,8 @@ start_link() ->
                           [],%给init函数的参数
                           []).%是参数的列表。具体的参数请查看 gen_server(3) 。
 
-%     gen_server:call(router, alloc).
-%     gen_server:cast(router, {free, Ch}).
-
-init(_Args) ->
-    {ok, #router_state{} }.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
-
 stop() ->
     gen_server:cast(router, stop).
-
-terminate(normal, _State) ->
-    ok.
 
 update_router()->
     Ref = erlang:make_ref(),
@@ -85,6 +81,15 @@ show()->
     ?log({"This Node:",node(),
         "Route tab:", gen_server:call(router, get_all_router_items),
         "Path to other:", gen_server:call(router, get_path_to_other)}).
+
+%% ============================================================================================
+%% gen_server Function
+%% ============================================================================================
+init(_Args) ->
+    {ok, #router_state{} }.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
+
+terminate(normal, _State) ->
+    ok.
 
 handle_call(get_path_to_other, _From, State) ->
     {reply, State#router_state.path_to_other, State};
@@ -140,6 +145,10 @@ handle_cast(_Request, OldState) ->
 
 handle_info(_Info,State)-> {noreply, State}.
 code_change(_OldVsn, State, _Extra)-> {ok, State}.
+
+%% ============================================================================================
+%% Internal Function
+%% ============================================================================================
 
 update_router_info(State, NewRouterMap)-> % NewState
     OldRouterMap = State#router_state.reouter_items,
