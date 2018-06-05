@@ -165,27 +165,27 @@ handle_router_map_list_result(RouteMap, RouterMapList)-> % NewRouterMap
         RouterMapList).
 
 find_path_for_all(RouterMap)->
-    Nodes = nodes(),
-    PathMap = lists:foldl(
+    Nodes = [node()|nodes()],
+    InitPathMap = lists:foldl(
         fun(N,Acc)->
             Acc#{N => [N]}
         end, #{}, Nodes),
-    find_path_for_all_help(RouterMap,
-                           PathMap#{node() => node()},
-                           queue:from_list(Nodes)).
+    find_path_for_all_help(RouterMap, InitPathMap, queue:from_list(Nodes)).
 
 find_path_for_all_help(RouterMap, PathMap, Queue)->
     case queue:out(Queue) of
-        {{value, Item}, NewQueue} ->
+        {{value, Item}, TQueue} ->
             #router_item{connected_list = NodesConnToThis} = maps:get(Item, RouterMap),
-            NewPathMap =
+            {NewPathMap,NewQueue} =
                 lists:foldl(
-                    fun(N,Acc)->
-                        case maps:is_key(N, Acc) of
-                            true-> Acc;
-                            false-> PathMap#{N => maps:get(Item, PathMap) ++ [N]}
+                    fun(N,{AccPathMap,AccQueue})->
+                        case maps:is_key(N, AccPathMap) of
+                            true-> {AccPathMap,AccQueue}; % N 节点已经在PathMap中了
+                            false->
+                                {AccPathMap#{N => maps:get(Item, PathMap) ++ [N]},
+                                 queue:in(N, AccQueue)}
                         end
-                    end, PathMap, NodesConnToThis),
+                    end, {PathMap,TQueue}, NodesConnToThis),
             find_path_for_all_help(RouterMap, NewPathMap, NewQueue);
         {empty, _} ->
             PathMap
