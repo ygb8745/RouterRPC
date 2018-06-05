@@ -119,10 +119,19 @@ handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
                                             [router, {update_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
                             RouterMapList
                     end,
-                handle_router_map_list_result(
-                                #{node() => #router_item{connected_list = nodes(),
-                                                        timestamp = os:timestamp()} }, %本节点直连点.
-                                SysUnKnowenNodeRouterMapList);
+                lists:foldl(
+                    fun(Item, Acc)->
+                        case Item of
+                            RouterMap when is_map(RouterMap) ->
+                                maps:merge(RouterMap, Acc);
+                            BadItem ->
+                                ?log({"BadRouterItem:",BadItem}),
+                                Acc
+                        end
+                    end,
+                    #{node() => #router_item{connected_list = nodes(),
+                                             timestamp = os:timestamp()} }, %本节点直连点. todo:时间戳改为整数形式
+                    SysUnKnowenNodeRouterMapList);
             _ ->
                 #{} % ignore 已经处理过这个router请求了
         end,
@@ -152,26 +161,12 @@ code_change(_OldVsn, State, _Extra)-> {ok, State}.
 
 update_router_info(State, NewRouterMap)-> % NewState
     OldRouterMap = State#router_state.reouter_items,
+    % TODO : 按照时间戳来决定merge的结果.
     NewRouterMap = maps:merge(NewRouterMap, OldRouterMap),
     ?log({"update_router_info new:",NewRouterMap}),
     PathMap = find_path_for_all(NewRouterMap),
     State#router_state{reouter_items = NewRouterMap,
                   path_to_other = PathMap}.
-
-% 将RouterMapList中的RouterMap和本节点的RouteMap合成一个总的RouterMap
-handle_router_map_list_result(RouteMap, RouterMapList)-> % NewRouterMap
-    lists:foldl(
-        fun(I, Acc)->
-            case I of
-                RouterMap when is_map(RouterMap) ->
-                    maps:merge(RouterMap, Acc);
-                BadItem ->
-                    ?log({"BadRouterItem:",BadItem}),
-                    Acc
-            end
-        end,
-        RouteMap,
-        RouterMapList).
 
 find_path_for_all(RouterMap)->
     Nodes = [node()|nodes()],
