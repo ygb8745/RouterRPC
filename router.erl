@@ -211,14 +211,20 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 %           向全网其他节点发出call({update_router_request, KnowenNodeList, Ref}
 %           全网的节点都回答收集的路由信息汇总到update_router()然后调用gen_server:cast(router, {update_router_info,RouterMap})更新本节点的信息.
 %           --有一定的死锁风险,当两个节点同时call对方时就会产生死锁.
+%           目前和路由先相关的主要有4个函数:
+%               update_router()
+%               handle_call({update_router_request, KnowenNodeList, Ref}, _From, State)
+%               handle_cast({update_router_info,RouterMap}, State)
+%               update_router_info(State, NewRouterMap)
 %       2.todo 每个节点都会在随机时间后尝试向所有已知节点发出ping请求连接,并向周围直连节点发出自己的路由表,
 %         周围节点收到路由表后开始更新自己的路由表.
 %           为了实现这一点,我们要在每个路由表项上加上一个时间戳来判断要不要更新路由表.
-%       目前和路由先相关的主要有4个函数:
-%           update_router()
-%           handle_call({update_router_request, KnowenNodeList, Ref}, _From, State)
-%           handle_cast({update_router_info,RouterMap}, State)
-%           update_router_info(State, NewRouterMap)
+%           ---------------
+%           时间戳无需,在这个系统里我们遵循以下原则:
+%               每个节点要么在自己节点直联表变化时发出路由信息,要么转发别人的变化信息,不会主动发出别人节点的路由信息.
+%           每个节点启动一个进程,每隔一段时间后就尝试ping所有已知节点,
+%           当本节点的nodes()表和State中的本节点路由项不同时就 1.更新自己的路由信息和path表 2.向其他节点广播自己的新变化
+%           其他节点收到新路由项后做 1.更新自己的路由信息和path表 2.向未知节点广播路由变化 3.X尝试ping所有节点,检查自己是否有路由信息变化.
 % todo
 % 在每个节点上都启动router进程
 % 改进路由算法.
