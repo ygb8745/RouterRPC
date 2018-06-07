@@ -42,8 +42,9 @@ init(_Args) ->
 terminate(normal, _State) ->
     ok.
 
-handle_call(get_path_to_other, _From, State) ->
-    {reply, State#router_state.path_to_other, State};
+handle_call({get_path_to_other, Node}, _From, State) ->
+    Path = maps:find(Node, State#router_state.path_to_other),
+    {reply, Path, State};
 handle_call(get_all_router_items, _From, State) ->
     {reply, State#router_state.reouter_items, State};
 handle_call({update_router_request, KnowenNodeList, Ref}, _From, State) ->
