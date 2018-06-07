@@ -23,5 +23,5 @@ router update done
 
 RPC:
 `
-router:rpc('otherName@otherHost',M,F,A).
+router_rpc:call('otherName@otherHost',M,F,A).
 `
