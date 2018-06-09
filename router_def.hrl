@@ -29,8 +29,9 @@ format_timestamp() ->
 
 -record(router_state,{
     reouter_items = #{}, % 每条记录是: 节点名-> [该节点可达的节点列表]
-    path_to_other = #{}  % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
+    path_to_other = #{}, % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
                          % 这个map下所有作为key的node()就是全部的已知节点.
+    help_pid             % help process
 }).
 
 % 用法 用于作为router_map的一项: node() => #router_item{}
