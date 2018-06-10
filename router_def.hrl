@@ -1,5 +1,5 @@
 %todo Makefile
--define(DEBUG, true).
+ -define(DEBUG, true).
 
 %% ============================================================================================
 %% Macro
@@ -22,6 +22,9 @@ format_timestamp() ->
 -endif.
 
 -define(undef, undefined).
+
+-define(time_to_del_ref, 100*1000).%100s
+-define(time_to_update_router, 2000).%2s
 
 %% ============================================================================================
 %% Data type
