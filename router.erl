@@ -88,12 +88,11 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                         end
                     end,
                     #{node() => #router_item{connected_list = nodes(),
-                                             timestamp = erlang:system_time(millisecond )} }, %本节点直连点. todo:时间戳改为整数形式
+                                             timestamp = erlang:system_time(millisecond )} }, %本节点直连点.
                     SysUnKnowenNodeRouterMapList);
             _ ->
                 #{} % ignore 已经处理过这个router请求了
         end,
-    update_router_info(State, RouterMap),% todo save info.
     {reply, RouterMap, State};
 handle_call(Request, _From, OldState) ->
     ?log({"router.unhandle_call:",[{Request, _From, OldState}]}),
