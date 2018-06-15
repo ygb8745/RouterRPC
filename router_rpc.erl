@@ -3,41 +3,11 @@
 
 -include("router_def.hrl").
 
-call(Path,M,F,A) when is_list(Path)->
-    [Target|PathrLeft] = lists:reverse(Path),
-    ArgList = lists:foldr(
-        fun(N,Acc) ->
-            [N, rpc, call, Acc]
-        end,
-        [Target,M,F,A],
-        PathrLeft
-    ),
-    erlang:apply(rpc, call, ArgList);
-call(Node,M,F,A)->
-    case gen_server:call(router, {get_path_to_other, Node}) of
-        {ok, Path}->
-            call(Path, M, F, A);
-        error ->
-            {error, node_path_not_found, Node}
-    end.
+call(NodeOrPath,M,F,A)->
+    commonRPC(call, NodeOrPath,M,F,A).
 
-cast(Path,M,F,A) when is_list(Path)->
-    [Target|PathrLeft] = lists:reverse(Path),
-    ArgList = lists:foldr(
-        fun(N,Acc) ->
-            [N, rpc, cast, Acc]
-        end,
-        [Target,M,F,A],
-        PathrLeft
-    ),
-    erlang:apply(rpc, cast, ArgList);
-cast(Node,M,F,A)->
-    case gen_server:call(router, {get_path_to_other, Node}) of
-        {ok, Path}->
-            cast(Path, M, F, A);
-        error ->
-            {error, node_path_not_found, Node}
-    end.
+cast(NodeOrPath,M,F,A)->
+    commonRPC(cast, NodeOrPath,M,F,A).
 
 %% trace router.
 tracert(Node)->
@@ -58,3 +28,24 @@ tracert(Node)->
 
 echo(Info)->
     Info.
+
+%% ============================================================================================
+%% Internal Function
+%% ============================================================================================
+
+commonRPC(Method, Path,M,F,A) when is_list(Path)->
+    [Target|PathrLeft] = lists:reverse(Path),
+    ArgList = lists:foldr(
+        fun(N,Acc) ->
+            [N, rpc, Method, Acc]
+        end,
+        [Target,M,F,A],
+        PathrLeft),
+    erlang:apply(rpc, Method, ArgList);
+commonRPC(Method, Node,M,F,A)->
+    case gen_server:call(router, {get_path_to_other, Node}) of
+        {ok, Path}->
+            commonRPC(Method, Path, M, F, A);
+        error ->
+            {error, node_path_not_found, Node}
+    end.
