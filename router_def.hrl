@@ -39,7 +39,7 @@ format_timestamp() ->
 % 用法 用于作为router_map的一项: node() => #router_item{}
 % -type router_map() = #{node_name() => #router_item{}}.
 % -type path_map() =   #{node_name() => [_Path_to_this_node = node_name()]}.
-% -type node_name() = atom().
+-type(node_name() :: atom()).
 -record(router_item,{
     connected_list, % [直连节点列表]
     timestamp % 最后更新该项的时间戳
