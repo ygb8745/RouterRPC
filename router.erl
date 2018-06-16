@@ -9,26 +9,26 @@
 %% API Function
 %% ============================================================================================
 start() ->
-    gen_server:start({local, router},%本地注册为router ,也可以通过whereis()函数来获得pid.
-                          router,%回调模块的名字
+    gen_server:start({local, ?MODULE},%本地注册为router ,也可以通过whereis()函数来获得pid.
+                          ?MODULE,%回调模块的名字
                           [],%给init函数的参数
                           []).%是参数的列表。具体的参数请查看 gen_server(3) 。
 start_link() ->
-    gen_server:start_link({local, router},%本地注册为router ,也可以通过whereis()函数来获得pid.
-                          router,%回调模块的名字
+    gen_server:start_link({local, ?MODULE},%本地注册为router ,也可以通过whereis()函数来获得pid.
+                          ?MODULE,%回调模块的名字
                           [],%给init函数的参数
                           []).%是参数的列表。具体的参数请查看 gen_server(3) 。
 
 stop() ->
-    gen_server:cast(router, stop).
+    gen_server:cast(?MODULE, stop).
 
 update_router()->
     Ref = erlang:make_ref(),
-    RouterMap = gen_server:call(router, {collect_router_request, [node()], Ref}),
-    gen_server:cast(router, {update_router_info,RouterMap}).
+    RouterMap = gen_server:call(?MODULE, {collect_router_request, [node()], Ref}),
+    gen_server:cast(?MODULE, {update_router_info,RouterMap}).
 
 show()->
-    State = gen_server:call(router, get_state),
+    State = gen_server:call(?MODULE, get_state),
     {"This Node:",node(),
      "Route tab:", State#router_state.reouter_items,
      "Path to other:", State#router_state.path_to_other}.
@@ -66,7 +66,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                                                                  sets:from_list(KnowenNodeList))),
                 ?log({"SysUnKnowenNodeList", SysUnKnowenNodeList}),
                 {SysUnKnowenNodeRouterMapList, _todo_BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
-                                [router, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
+                                [?MODULE, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
                 lists:foldl(
                     fun(RouterMap, Acc) when is_map(RouterMap)->
                                 maps:merge(RouterMap, Acc);
@@ -134,17 +134,17 @@ create_help_process()->
                     exit(normal)
                 after ?time_to_update_router ->
                     ?log(self()),
-                    AllNodesList = gen_server:call(router, get_all_nodes),
+                    AllNodesList = gen_server:call(?MODULE, get_all_nodes),
                     lists:foreach(fun(N)->
                         net_adm:ping(N),
                         % 尝试在各个节点启动router
-                        router_rpc:cast(N, router, start, [])
+                        router_rpc:cast(N, ?MODULE, start, [])
                     end, AllNodesList),
                     NewRouterMap = #{node() => #router_item{connected_list = nodes(),
                                                 timestamp = erlang:system_time(millisecond)}},
-                    gen_server:cast(router, {update_router_info, NewRouterMap}),%更新本地路由信息
+                    gen_server:cast(?MODULE, {update_router_info, NewRouterMap}),%更新本地路由信息
                     rpc:multicall(gen_server, cast,
-                                    [router, {update_router_item, NewRouterMap, [node()], erlang:make_ref()}])
+                                    [?MODULE, {update_router_item, NewRouterMap, [node()], erlang:make_ref()}])
             end,
             Fun()
         end).
@@ -153,7 +153,7 @@ handle_ref(Ref)->
     put(Ref, true),
     spawn(fun()->
         timer:sleep(?time_to_del_ref),
-        gen_server:cast(router,{del_ref, Ref})
+        gen_server:cast(?MODULE,{del_ref, Ref})
     end).
 
 update_router_info(State, NewRouterMap)-> % NewState
