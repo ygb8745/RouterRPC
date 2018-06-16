@@ -13,9 +13,5 @@ Erlang RouterRPC
 RPC:`router_rpc:call('otherName@otherHost',M,F,A).`
 
 todo:
->code server <br>
-    code:get_object_code(Module) -> {Module, Binary, Filename} | error <br>
-    code:load_binary(Module, Filename, Binary) -> {module, Module} | {error, What} <br>
-    This function can be used to load object code on remote Erlang nodes. <br>
 
 >改进log系统,用gen_server处理log.
