@@ -80,7 +80,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                             Acc
                     end,
                     #{node() => #router_item{connected_list = nodes(),
-                                             timestamp = erlang:system_time(millisecond )} }, %本节点直连点.
+                                             timestamp = erlang:system_time(millisecond)} }, %本节点直连点.
                     SysUnKnowenNodeRouterMapList);
             _ ->
                 #{} % ignore 已经处理过这个router请求了
@@ -120,7 +120,7 @@ handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
     InternalLevel = State#router_state.log_level,
     if Level =< InternalLevel ->
             io:format("=> ~p~n"
-                    "\t\t\t\t log: N:~p P:~p M:~p L:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
+                      "\t\t\t\t log: N:~p P:~p M:~p L:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
         true -> void
     end,
     {noreply, State};
@@ -144,7 +144,7 @@ create_help_process()->
     spawn_link(fun Fun()->
             process_flag(trap_exit, true),
             receive
-                {'EXIT', _Pid, _Why} = ExitMsg ->%??
+                {'EXIT', _Pid, _Why} = ExitMsg ->
                     ?log(9, ExitMsg),
                     exit(normal)
                 after ?time_to_update_router ->
@@ -156,7 +156,7 @@ create_help_process()->
                         router_rpc:cast(N, ?MODULE, start, [])
                     end, AllNodesList),
                     NewRouterMap = #{node() => #router_item{connected_list = nodes(),
-                                                timestamp = erlang:system_time(millisecond)}},
+                                                            timestamp = erlang:system_time(millisecond)}},
                     gen_server:cast(?MODULE, {update_router_info, NewRouterMap}),%更新本地路由信息
                     rpc:multicall(gen_server, cast,
                                     [?MODULE, {update_router_item, NewRouterMap, [node()], erlang:make_ref()}])
@@ -174,9 +174,15 @@ handle_ref(Ref)->
 update_router_info(State, NewRouterMap)-> % NewState
     OldRouterMap = State#router_state.reouter_items,
     NewRouterMap1 = maps:merge(OldRouterMap, NewRouterMap),% the value in Map1 is superseded by the value in Map2
-    ?log({"update_router_info new:",NewRouterMap1}),
-    PathMap = find_path_for_all(NewRouterMap1),
-    State#router_state{reouter_items = NewRouterMap1,
+    % 过滤掉太老的路由项.
+    NewRouterMap2 = maps:filter(
+        fun(_K,#router_item{timestamp = Timestamp} = _V)->
+            Timestamp > erlang:system_time(millisecond) - ?live_period_for_router_item * ?time_to_update_router
+        end,
+        NewRouterMap1),
+    ?log({"update_router_info new:",NewRouterMap2}),
+    PathMap = find_path_for_all(NewRouterMap2),
+    State#router_state{reouter_items = NewRouterMap2,
                        path_to_other = PathMap}.
 
 find_path_for_all(RouterMap)->
@@ -243,5 +249,5 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 % 代码远程加载
 
 % todo
-%
+%   节点的退出机制.
 % io输出有冲突

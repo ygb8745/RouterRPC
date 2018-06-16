@@ -8,6 +8,7 @@
     -define(log(What), ?log(11, What)).
     -define(log(Level, What),
                 gen_server:cast(router,{log, {Level, What, node(), self(), ?MODULE,?LINE,format_timestamp()}})).
+
     format_timestamp() ->
         {_,_,Micro} = os:timestamp(),
         {{_Year,_Month,_Day},{Hour,Minute,Second}} =
@@ -24,6 +25,7 @@
 
 -define(time_to_del_ref, 100*1000).%100s
 -define(time_to_update_router, 2000).%2s
+-define(live_period_for_router_item, 10). % 每个路由项的生成周期.
 
 %% ============================================================================================
 %% Data type
