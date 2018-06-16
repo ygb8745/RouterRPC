@@ -140,27 +140,20 @@ code_change(_OldVsn, State, _Extra)-> {ok, State}.
 %% ============================================================================================
 
 create_help_process()->
-    process_flag(trap_exit, true),
     spawn_link(fun Fun()->
-            process_flag(trap_exit, true),
-            receive
-                {'EXIT', _Pid, _Why} = ExitMsg ->
-                    ?log(9, ExitMsg),
-                    exit(normal)
-                after ?time_to_update_router ->
-                    ?log(self()),
-                    AllNodesList = gen_server:call(?MODULE, get_all_nodes),
-                    lists:foreach(fun(N)->
-                        net_adm:ping(N),
-                        % 尝试在各个节点启动router
-                        router_rpc:cast(N, ?MODULE, start, [])
-                    end, AllNodesList),
-                    NewRouterMap = #{node() => #router_item{connected_list = nodes(),
-                                                            timestamp = erlang:system_time(millisecond)}},
-                    gen_server:cast(?MODULE, {update_router_info, NewRouterMap}),%更新本地路由信息
-                    rpc:multicall(gen_server, cast,
-                                    [?MODULE, {update_router_item, NewRouterMap, [node()], erlang:make_ref()}])
-            end,
+            timer:sleep(?time_to_update_router),
+            ?log(self()),
+            AllNodesList = gen_server:call(?MODULE, get_all_nodes),
+            lists:foreach(fun(N)->
+                net_adm:ping(N),
+                % 尝试在各个节点启动router
+                router_rpc:cast(N, ?MODULE, start, [])
+            end, AllNodesList),
+            NewRouterMap = #{node() => #router_item{connected_list = nodes(),
+                                                    timestamp = erlang:system_time(millisecond)}},
+            gen_server:cast(?MODULE, {update_router_info, NewRouterMap}),%更新本地路由信息
+            rpc:multicall(gen_server, cast,
+                            [?MODULE, {update_router_item, NewRouterMap, [node()], erlang:make_ref()}]),
             Fun()
         end).
 
