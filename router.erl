@@ -40,6 +40,7 @@ set_log_level(Level)->
 %% gen_server Function
 %% ============================================================================================
 init(_Args) ->
+    % Log在本地输出.
     erlang:group_leader(whereis(init),self()),
     Pid = create_help_process(),
     {ok, #router_state{help_pid = Pid} }.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
@@ -88,7 +89,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
 handle_call({set_log_level, Level}, _From, State) ->
     {reply, ok, State#router_state{log_level = Level}};
 handle_call(Request, _From, OldState) ->
-    ?log(1, {"router.unhandle_call:",[{Request, _From, OldState}]}),
+    ?log(1, {"router.unhandle_call:",{Request, _From, OldState}}),
     {reply, Request, OldState}. %{reply, Reply, State1}。Reply是需要回馈给客户端的答复，同时 State1 是gen_server的状态的新值。
 
 handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State) ->
@@ -126,7 +127,7 @@ handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Request, OldState) ->
-    ?log(1, {"router.unhandle_cast:",[{_Request, OldState}]}),
+    ?log(1, {"router.unhandle_cast:",{_Request, OldState}}),
     {noreply, OldState}.
 
 handle_info(Info,State)->
@@ -236,6 +237,9 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 %               handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State)
 %               *handle_cast({update_router_info,RouterMap}, State)
 %               *update_router_info(State, NewRouterMap)
+%
+% Log系统
+%   带有优先级的log系统.
+% 代码远程加载
 
 % todo
-% erlang 复合数据结构的等于比较 比如sets list map
