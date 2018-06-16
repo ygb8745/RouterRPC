@@ -1,9 +1,6 @@
 -module(router).
 -behaviour(gen_server).
 
-% -export([start_link/0]).
-% -export([alloc/0, free/1]).
-% -export([init/1, handle_call/3, handle_cast/2]).
 -compile(export_all).
 
 -include("router_def.hrl").
@@ -68,24 +65,14 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                 SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                                  sets:from_list(KnowenNodeList))),
                 ?log({"SysUnKnowenNodeList", SysUnKnowenNodeList}),
-                SysUnKnowenNodeRouterMapList=
-                    case SysUnKnowenNodeList of
-                        []-> %do nothing
-                            [];
-                        _ ->
-                            {RouterMapList, _todo_BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
-                                            [router, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
-                            RouterMapList
-                    end,
+                {SysUnKnowenNodeRouterMapList, _todo_BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
+                                [router, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
                 lists:foldl(
-                    fun(Item, Acc)->
-                        case Item of
-                            RouterMap when is_map(RouterMap) ->
+                    fun(RouterMap, Acc) when is_map(RouterMap)->
                                 maps:merge(RouterMap, Acc);
-                            BadItem ->
-                                ?log({"BadRouterItem:",BadItem}),
+                       (BadRouterMap, Acc) ->
+                                ?log({"BadRouterItem:",BadRouterMap}),
                                 Acc
-                        end
                     end,
                     #{node() => #router_item{connected_list = nodes(),
                                              timestamp = erlang:system_time(millisecond )} }, %本节点直连点.
