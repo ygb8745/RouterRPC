@@ -40,6 +40,7 @@ set_log_level(Level)->
 %% gen_server Function
 %% ============================================================================================
 init(_Args) ->
+    erlang:group_leader(whereis(init),self()),
     Pid = create_help_process(),
     {ok, #router_state{help_pid = Pid} }.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
 
