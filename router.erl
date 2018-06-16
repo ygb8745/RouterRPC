@@ -74,10 +74,10 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                                 [?MODULE, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
                 lists:foldl(
                     fun(RouterMap, Acc) when is_map(RouterMap)->
-                                maps:merge(RouterMap, Acc);
+                            maps:merge(RouterMap, Acc);
                        (BadRouterMap, Acc) ->
-                                ?log(9, {"BadRouterItem:",BadRouterMap}),
-                                Acc
+                            ?log(9, {"BadRouterItem:",BadRouterMap}),
+                            Acc
                     end,
                     #{node() => #router_item{connected_list = nodes(),
                                              timestamp = erlang:system_time(millisecond )} }, %本节点直连点.
@@ -243,3 +243,5 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 % 代码远程加载
 
 % todo
+%
+% io输出有冲突
