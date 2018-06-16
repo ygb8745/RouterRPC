@@ -1,23 +1,22 @@
- -define(DEBUG, true).
+-define(DEBUG, true).
 
 %% ============================================================================================
 %% Macro
 %% ============================================================================================
 
 -ifdef(DEBUG).
-%todo 带有优先级的log
--define(log(What),
-            io:format(
-                "=> ~p~n"
-                "\t\t\t\t log: N:~p P:~p M:~p L:~p T:~s~n",[What, node(), self(), ?MODULE,?LINE,format_timestamp()])).
-format_timestamp() ->
-    {_,_,Micro} = os:timestamp(),
-    {{_Year,_Month,_Day},{Hour,Minute,Second}} =
-        calendar:local_time(),
-     io_lib:format("~p:~p:~p.~p",
-                    [Hour,Minute,Second,Micro]).
+    -define(log(What), ?log(11, What)).
+    -define(log(Level, What),
+                gen_server:cast(router,{log, {Level, What, node(), self(), ?MODULE,?LINE,format_timestamp()}})).
+    format_timestamp() ->
+        {_,_,Micro} = os:timestamp(),
+        {{_Year,_Month,_Day},{Hour,Minute,Second}} =
+            calendar:local_time(),
+        io_lib:format("~p:~p:~p.~p",
+                        [Hour,Minute,Second,Micro]).
 -else.
--define(log(What), void).
+    -define(log(_What), void).
+    -define(log(_Level, _What), void).
 -endif.
 
 -define(undef, undefined).
@@ -33,7 +32,9 @@ format_timestamp() ->
     reouter_items = #{}, % 每条记录是: 节点名-> [该节点可达的节点列表]
     path_to_other = #{}, % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
                          % 这个map下所有作为key的node()就是全部的已知节点.
-    help_pid             % help process
+    help_pid,            % help process
+    log_level = 10    % log优先级数字小于等于此值得才会被处理.
+                         %      log优先级,数字越小优先级越高,最高为0.
 }).
 
 % 用法 用于作为router_map的一项: node() => #router_item{}

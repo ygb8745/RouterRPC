@@ -13,5 +13,3 @@ Erlang RouterRPC
 RPC:`router_rpc:call('otherName@otherHost',M,F,A).`
 
 todo:
-
->改进log系统,用gen_server处理log.

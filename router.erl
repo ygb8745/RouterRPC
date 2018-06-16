@@ -33,6 +33,9 @@ show()->
      "Route tab:", State#router_state.reouter_items,
      "Path to other:", State#router_state.path_to_other}.
 
+set_log_level(Level)->
+    gen_server:call(?MODULE, {set_log_level, Level}).
+
 %% ============================================================================================
 %% gen_server Function
 %% ============================================================================================
@@ -71,7 +74,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                     fun(RouterMap, Acc) when is_map(RouterMap)->
                                 maps:merge(RouterMap, Acc);
                        (BadRouterMap, Acc) ->
-                                ?log({"BadRouterItem:",BadRouterMap}),
+                                ?log(9, {"BadRouterItem:",BadRouterMap}),
                                 Acc
                     end,
                     #{node() => #router_item{connected_list = nodes(),
@@ -81,8 +84,10 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                 #{} % ignore 已经处理过这个router请求了
         end,
     {reply, RouterMap, State};
+handle_call({set_log_level, Level}, _From, State) ->
+    {reply, ok, State#router_state{log_level = Level}};
 handle_call(Request, _From, OldState) ->
-    ?log({"router.unhandle_call:",[{Request, _From, OldState}]}),
+    ?log(1, {"router.unhandle_call:",[{Request, _From, OldState}]}),
     {reply, Request, OldState}. %{reply, Reply, State1}。Reply是需要回馈给客户端的答复，同时 State1 是gen_server的状态的新值。
 
 handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State) ->
@@ -109,14 +114,22 @@ handle_cast({update_router_info,NewRouterMap}, State) ->
 handle_cast({del_ref, Ref}, State) ->
     erase(Ref),
     {noreply, State};
+handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
+    InternalLevel = State#router_state.log_level,
+    if Level =< InternalLevel ->
+            io:format("=> ~p~n"
+                    "\t\t\t\t log: N:~p P:~p M:~p L:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
+        true -> void
+    end,
+    {noreply, State};
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Request, OldState) ->
-    ?log({"router.unhandle_cast:",[{_Request, OldState}]}),
+    ?log(1, {"router.unhandle_cast:",[{_Request, OldState}]}),
     {noreply, OldState}.
 
 handle_info(Info,State)->
-    ?log({"router.unhandle_info:",Info}),
+    ?log(1, {"router.unhandle_info:",Info}),
     {noreply, State}.
 code_change(_OldVsn, State, _Extra)-> {ok, State}.
 
@@ -130,7 +143,7 @@ create_help_process()->
             process_flag(trap_exit, true),
             receive
                 {'EXIT', _Pid, _Why} = ExitMsg ->%??
-                    ?log(ExitMsg),
+                    ?log(9, ExitMsg),
                     exit(normal)
                 after ?time_to_update_router ->
                     ?log(self()),
