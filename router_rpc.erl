@@ -6,6 +6,13 @@
 call(NodeOrPath,M,F,A)->
     commonRPC(call, NodeOrPath,M,F,A).
 
+multicall(M,F,A)->
+    AllNodes = gen_server:call(router, get_all_nodes),
+    multicall(AllNodes,M,F,A).
+multicall(Nodes,M,F,A)->
+    Fun = fun(Node) -> call(Node,M,F,A) end,
+    lists:map(Fun, Nodes).
+
 cast(NodeOrPath,M,F,A)->
     commonRPC(cast, NodeOrPath,M,F,A).
 
