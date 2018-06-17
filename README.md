@@ -11,5 +11,3 @@ Erlang RouterRPC
 等待更新路由完成`router update done`
 
 RPC:`router_rpc:call('otherName@otherHost',M,F,A).`
-
-todo:<br>

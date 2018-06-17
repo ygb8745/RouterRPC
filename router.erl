@@ -70,7 +70,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                 SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                                  sets:from_list(KnowenNodeList))),
                 ?log({"SysUnKnowenNodeList", SysUnKnowenNodeList}),
-                {SysUnKnowenNodeRouterMapList, _todo_BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
+                {SysUnKnowenNodeRouterMapList, _BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
                                 [?MODULE, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
                 lists:foldl(
                     fun(RouterMap, Acc) when is_map(RouterMap)->
@@ -151,9 +151,8 @@ create_help_process()->
             end, AllNodesList),
             NewRouterMap = #{node() => #router_item{connected_list = nodes(),
                                                     timestamp = erlang:system_time(millisecond)}},
-            gen_server:cast(?MODULE, {update_router_info, NewRouterMap}),%更新本地路由信息
             rpc:multicall(gen_server, cast,
-                            [?MODULE, {update_router_item, NewRouterMap, [node()], erlang:make_ref()}]),
+                            [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]),
             Fun()
         end).
 
@@ -184,7 +183,7 @@ update_router_info(State, NewRouterMap)-> % NewState
     State#router_state{reouter_items = NewRouterMap2,
                        path_to_other = PathMap}.
 
-find_path_for_all(RouterMap)->
+find_path_for_all(RouterMap)->%PathMap
     Nodes = [node()|nodes()],
     InitPathMap = lists:foldl(
         fun(N,Acc)->
@@ -192,7 +191,7 @@ find_path_for_all(RouterMap)->
         end, #{}, Nodes),
     find_path_for_all_help(RouterMap, InitPathMap, queue:from_list(Nodes)).
 
-find_path_for_all_help(RouterMap, PathMap, Queue)->
+find_path_for_all_help(RouterMap, PathMap, Queue)->%PathMap
     case queue:out(Queue) of
         {{value, Item}, TQueue} ->
             {NewPathMap,NewQueue} =
@@ -228,7 +227,7 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 %           目前和此路由相关的主要有函数:
 %               update_router()
 %               handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State)
-%               *handle_cast({update_router_info,RouterMap}, State)
+%               handle_cast({update_router_info,RouterMap}, State)
 %               *update_router_info(State, NewRouterMap)
 %       2.每个节点都会在随机时间后尝试向所有已知节点发出ping请求连接,并向周围直连节点发出自己的路由表,
 %         周围节点收到路由表后开始更新自己的路由表.
@@ -240,7 +239,6 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 %           目前和此路由相关的主要有函数:
 %               create_help_process()
 %               handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State)
-%               *handle_cast({update_router_info,RouterMap}, State)
 %               *update_router_info(State, NewRouterMap)
 %
 % Log系统
@@ -248,6 +246,9 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 % 代码远程加载
 
 % todo
-%   节点的退出机制.
 %   删除第一种路由逻辑.
-% io输出有冲突
+%   io输出有冲突
+%   trace
+
+% 其他信息
+%   获取各个节点OPT版本信息. router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).

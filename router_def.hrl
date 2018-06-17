@@ -25,7 +25,7 @@
 
 -define(time_to_del_ref, 100*1000).%100s
 -define(time_to_update_router, 2000).%2s
--define(live_period_for_router_item, 10). % 每个路由项的生成周期.
+-define(live_period_for_router_item, 10). % 每个路由项的生存周期.
 
 %% ============================================================================================
 %% Data type
