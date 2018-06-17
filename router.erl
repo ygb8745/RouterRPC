@@ -169,8 +169,14 @@ update_router_info(State, NewRouterMap)-> % NewState
     NewRouterMap1 = maps:merge(OldRouterMap, NewRouterMap),% the value in Map1 is superseded by the value in Map2
     % 过滤掉太老的路由项.
     NewRouterMap2 = maps:filter(
-        fun(_K,#router_item{timestamp = Timestamp} = _V)->
-            Timestamp > erlang:system_time(millisecond) - ?live_period_for_router_item * ?time_to_update_router
+        fun(Node, #router_item{timestamp = Timestamp})->
+            LegalTime = erlang:system_time(millisecond) - ?live_period_for_router_item * ?time_to_update_router,
+            Result = Timestamp > LegalTime,
+            case Result of
+                true -> do_nothing;
+                false -> ?log(1,{"Node disconnectd", Node})
+            end,
+            Result
         end,
         NewRouterMap1),
     ?log({"update_router_info new:",NewRouterMap2}),
@@ -243,4 +249,5 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->
 
 % todo
 %   节点的退出机制.
+%   删除第一种路由逻辑.
 % io输出有冲突
