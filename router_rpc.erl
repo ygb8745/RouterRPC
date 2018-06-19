@@ -40,6 +40,7 @@ echo(Info)->
 %% Internal Function
 %% ============================================================================================
 
+% Method :: call | cast
 commonRPC(Method, Path,M,F,A) when is_list(Path)->
     [Target|PathrLeft] = lists:reverse(Path),
     ArgList = lists:foldr(

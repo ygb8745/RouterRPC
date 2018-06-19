@@ -9,12 +9,12 @@
 %% API Function
 %% ============================================================================================
 start() ->
-    gen_server:start({local, ?MODULE},%本地注册为router ,也可以通过whereis()函数来获得pid.
+    gen_server:start({local, ?MODULE},%本地注册为?MODULE ,也可以通过whereis()函数来获得pid.
                           ?MODULE,%回调模块的名字
                           [],%给init函数的参数
                           []).%是参数的列表。具体的参数请查看 gen_server(3) 。
 start_link() ->
-    gen_server:start_link({local, ?MODULE},%本地注册为router ,也可以通过whereis()函数来获得pid.
+    gen_server:start_link({local, ?MODULE},%本地注册为?MODULE ,也可以通过whereis()函数来获得pid.
                           ?MODULE,%回调模块的名字
                           [],%给init函数的参数
                           []).%是参数的列表。具体的参数请查看 gen_server(3) 。
@@ -260,8 +260,8 @@ read_config()->
             {ok,[ConfigMap | _]} = file:consult("router.config"),
             ConfigMap
         catch
-            T:E ->
-                ?log(9, {"Error when read config",T,E}),
+            T:P ->
+                ?log(9, {"Error when read config",T,P}),
                 #{}
         end,
     DefaultConfigMap =
@@ -310,6 +310,7 @@ get_config_from_state(Key, #router_state{config = Config})->
 % Log系统
 %   带有优先级的log系统.
 % 代码远程加载
+% 配置文件
 
 % todo
 %   删除第一种路由逻辑.
@@ -318,8 +319,11 @@ get_config_from_state(Key, #router_state{config = Config})->
 %   跨网段代理
 %   配置文件map读取
 %       从家目录读取.
+%           os:type() -> {Osfamily, Osname}
+%           os:getenv(VarName) -> Value | false     win:"USERPROFILE"  Lin:"HOME"
 %   角色系统,全局注册名称.
 %       node name conflict.
+%   通信加密.
 
 % 其他信息
 %   获取各个节点OPT版本信息:    router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).
