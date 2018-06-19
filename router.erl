@@ -67,7 +67,9 @@ handle_call(get_state, _From, State) ->
 % -- for config
 handle_call({update_config, NewConfig}, _From, #router_state{config = OldConfig} = State) ->
     {reply, ok, State#router_state{config = maps:merge(OldConfig, NewConfig)}};
-handle_call({get_config, Key}, _From, #router_state{config = Config} = State) ->% {ok, Vlue} | error.
+handle_call(get_config, _From, #router_state{config = Config} = State) ->% ConfigMap
+    {reply, Config, State};
+handle_call({get_config, Key}, _From, #router_state{config = Config} = State) ->% {ok, Value} | error.
     Reply = maps:find(Key, Config),
     {reply, Reply, State};
 
@@ -88,7 +90,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
     RouterMap =
         case get(Ref) of
             ?undef ->
-                handle_ref(Ref),
+                handle_ref(State, Ref),
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
                 SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                                  sets:from_list(KnowenNodeList))),
@@ -120,7 +122,7 @@ handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State) ->
     NewState =
         case get(Ref) of
             ?undef ->
-                handle_ref(Ref),
+                handle_ref(State, Ref),
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
                 SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                                  sets:from_list(KnowenNodeList))),
@@ -140,7 +142,7 @@ handle_cast({del_ref, Ref}, State) ->
     erase(Ref),
     {noreply, State};
 handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
-    {ok, InternalLevel} = get_config(?log_level),
+    {ok, InternalLevel} = get_config_from_state(?log_level, State),
     if Level =< InternalLevel ->
             io:format("=> ~p~n"
                       "\t\t\t\t->log: N:~p P:~p M:~p L:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
@@ -187,10 +189,10 @@ create_help_process()->
             Fun()
         end).
 
-handle_ref(Ref)->
+handle_ref(State, Ref)->
     put(Ref, true),
     spawn(fun()->
-        {ok, TimeToDelRef} = get_config(?time_to_del_ref),
+        {ok, TimeToDelRef} = get_config_from_state(?time_to_del_ref, State),
         timer:sleep(TimeToDelRef),
         gen_server:cast(?MODULE,{del_ref, Ref})
     end).
@@ -201,8 +203,8 @@ update_router_info(State, NewRouterMap)-> % NewState
     % 过滤掉太老的路由项.
     NewRouterMap2 = maps:filter(
         fun(Node, #router_item{timestamp = Timestamp})->
-            {ok, LivePeriod} = get_config(?live_period_for_router_item),
-            {ok, TimeToUpdateRouter} = get_config(?time_to_update_router),
+            {ok, LivePeriod} = get_config_from_state(?live_period_for_router_item, State),
+            {ok, TimeToUpdateRouter} = get_config_from_state(?time_to_update_router, State),
             LegalTime = erlang:system_time(millisecond) - LivePeriod * TimeToUpdateRouter,
             Result = Timestamp > LegalTime,
             case Result of
@@ -276,6 +278,10 @@ read_config()->
         },
     maps:merge(DefaultConfigMap, UserConfigedMap).
 
+% -spec get_config_from_state(Key)-> {ok, Vlue} | error.
+get_config_from_state(Key, #router_state{config = Config})->
+    maps:find(Key, Config).
+
 % doc
 % 路由算法:
 %   这里面设计了两套路由逻辑:
@@ -312,9 +318,9 @@ read_config()->
 %   跨网段代理
 %   配置文件map读取
 %       从家目录读取.
-%       load all other node
 %   角色系统,全局注册名称.
 %       node name conflict.
 
 % 其他信息
-%   获取各个节点OPT版本信息. router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).
+%   获取各个节点OPT版本信息:    router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).
+%   load config to all other node:  router_rpc:multicall(gen_server, call, [router, {update_config, gen_server:call(router, get_config)}])
