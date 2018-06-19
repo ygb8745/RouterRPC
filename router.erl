@@ -27,14 +27,24 @@ update_router()->
     RouterMap = gen_server:call(?MODULE, {collect_router_request, [node()], Ref}),
     gen_server:cast(?MODULE, {update_router_info,RouterMap}).
 
+set_log_level(Level)->
+    gen_server:call(?MODULE,{update_config,#{?log_level => Level}}).
+
+update_config()->
+    Config = read_config(),
+    gen_server:call(?MODULE, {update_config, Config}).
+
+% -spec get_config(Key)-> {ok, Vlue} | error.
+get_config(Key)->
+    gen_server:call(?MODULE, {get_config, Key}).
+
 show()->
     State = gen_server:call(?MODULE, get_state),
-    {"This Node:",node(),
-     "Route tab:", State#router_state.reouter_items,
-     "Path to other:", State#router_state.path_to_other}.
-
-set_log_level(Level)->
-    gen_server:call(?MODULE, {set_log_level, Level}).
+    {"This Node:",      node(),
+     "Route tab:",      State#router_state.reouter_items,
+     "Path to other:",  State#router_state.path_to_other,
+     "help pid:",       State#router_state.help_pid,
+     "Config:",         State#router_state.config}.
 
 %% ============================================================================================
 %% gen_server Function
@@ -43,7 +53,9 @@ init(_Args) ->
     % Log在本地输出.
     erlang:group_leader(whereis(init),self()),
     Pid = create_help_process(),
-    {ok, #router_state{help_pid = Pid} }.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
+    Config = read_config(),
+    {ok, #router_state{help_pid = Pid,
+                       config = Config}}.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
 
 terminate(normal, _State) ->
     ok.
@@ -51,6 +63,15 @@ terminate(normal, _State) ->
 handle_call(get_state, _From, State) ->
     % for debug
     {reply, State, State};
+
+% -- for config
+handle_call({update_config, NewConfig}, _From, #router_state{config = OldConfig} = State) ->
+    {reply, ok, State#router_state{config = maps:merge(OldConfig, NewConfig)}};
+handle_call({get_config, Key}, _From, #router_state{config = Config} = State) ->% {ok, Vlue} | error.
+    Reply = maps:find(Key, Config),
+    {reply, Reply, State};
+
+% -- to get router info
 handle_call(get_all_nodes, _From, State) ->
     AllNodesList = maps:keys(State#router_state.path_to_other),
     {reply, AllNodesList, State};
@@ -59,6 +80,8 @@ handle_call({get_path_to_other, Node}, _From, State) ->
     {reply, Path, State};
 handle_call(get_all_router_items, _From, State) ->
     {reply, State#router_state.reouter_items, State};
+
+% -- to collect router info
 handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
     % KnowenNodeList :: [已知节点]
     ?log({collect_router_request, KnowenNodeList, Ref}),
@@ -86,8 +109,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                 #{} % ignore 已经处理过这个router请求了
         end,
     {reply, RouterMap, State};
-handle_call({set_log_level, Level}, _From, State) ->
-    {reply, ok, State#router_state{log_level = Level}};
+
 handle_call(Request, _From, OldState) ->
     ?log(1, {"router.unhandle_call:",{Request, _From, OldState}}),
     {reply, Request, OldState}. %{reply, Reply, State1}。Reply是需要回馈给客户端的答复，同时 State1 是gen_server的状态的新值。
@@ -101,7 +123,7 @@ handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State) ->
                 handle_ref(Ref),
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
                 SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
-                                                                sets:from_list(KnowenNodeList))),
+                                                                 sets:from_list(KnowenNodeList))),
                 rpc:multicall(SysUnKnowenNodeList, gen_server, cast,
                                 [router, {update_router_item, NewRouterMap, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
                 % 更新本地路由信息
@@ -113,17 +135,19 @@ handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State) ->
 handle_cast({update_router_info,NewRouterMap}, State) ->
     NewState = update_router_info(State, NewRouterMap),
     {noreply, NewState};
+
 handle_cast({del_ref, Ref}, State) ->
     erase(Ref),
     {noreply, State};
 handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
-    InternalLevel = State#router_state.log_level,
+    {ok, InternalLevel} = get_config(?log_level),
     if Level =< InternalLevel ->
             io:format("=> ~p~n"
-                      "\t\t\t\t log: N:~p P:~p M:~p L:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
+                      "\t\t\t\t->log: N:~p P:~p M:~p L:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
         true -> void
     end,
     {noreply, State};
+
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Request, OldState) ->
@@ -133,7 +157,10 @@ handle_cast(_Request, OldState) ->
 handle_info(Info,State)->
     ?log(1, {"router.unhandle_info:",Info}),
     {noreply, State}.
-code_change(_OldVsn, State, _Extra)-> {ok, State}.
+
+code_change(_OldVsn, State, _Extra)->
+    ?log(1, {"router.code_change",_OldVsn, State, _Extra}),
+    {ok, State}.
 
 %% ============================================================================================
 %% Internal Function
@@ -141,8 +168,12 @@ code_change(_OldVsn, State, _Extra)-> {ok, State}.
 
 create_help_process()->
     spawn_link(fun Fun()->
-            timer:sleep(?time_to_update_router),
-            ?log(self()),
+            SleepTime = case get_config(?time_to_update_router) of
+                {ok, Value} -> Value;
+                error -> 3000 % The first time.
+            end,
+            timer:sleep(SleepTime),
+            ?log({"help proc",self()}),
             AllNodesList = gen_server:call(?MODULE, get_all_nodes),
             lists:foreach(fun(N)->
                 net_adm:ping(N),
@@ -159,7 +190,8 @@ create_help_process()->
 handle_ref(Ref)->
     put(Ref, true),
     spawn(fun()->
-        timer:sleep(?time_to_del_ref),
+        {ok, TimeToDelRef} = get_config(?time_to_del_ref),
+        timer:sleep(TimeToDelRef),
         gen_server:cast(?MODULE,{del_ref, Ref})
     end).
 
@@ -169,7 +201,9 @@ update_router_info(State, NewRouterMap)-> % NewState
     % 过滤掉太老的路由项.
     NewRouterMap2 = maps:filter(
         fun(Node, #router_item{timestamp = Timestamp})->
-            LegalTime = erlang:system_time(millisecond) - ?live_period_for_router_item * ?time_to_update_router,
+            {ok, LivePeriod} = get_config(?live_period_for_router_item),
+            {ok, TimeToUpdateRouter} = get_config(?time_to_update_router),
+            LegalTime = erlang:system_time(millisecond) - LivePeriod * TimeToUpdateRouter,
             Result = Timestamp > LegalTime,
             case Result of
                 true -> do_nothing;
@@ -216,6 +250,32 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->%PathMap
             PathMap
     end.
 
+% -spec read_config()-> ConfigMap
+read_config()->
+    UserConfigedMap =
+        try
+            % todo: read from home dir.
+            {ok,[ConfigMap | _]} = file:consult("router.config"),
+            ConfigMap
+        catch
+            T:E ->
+                ?log(9, {"Error when read config",T,E}),
+                #{}
+        end,
+    DefaultConfigMap =
+        #{
+            %删除ref的时间.
+            ?time_to_del_ref=> 100*1000,
+            % 更新路由信息的时间
+            ?time_to_update_router => 2*1000,
+            % 每条路由生存周期.
+            ?live_period_for_router_item => 10,
+            % 要显示log的最低等级
+            % log优先级,数字越小优先级越高,最高为0.
+            ?log_level => 10
+        },
+    maps:merge(DefaultConfigMap, UserConfigedMap).
+
 % doc
 % 路由算法:
 %   这里面设计了两套路由逻辑:
@@ -249,6 +309,12 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->%PathMap
 %   删除第一种路由逻辑.
 %   io输出有冲突
 %   trace
+%   跨网段代理
+%   配置文件map读取
+%       从家目录读取.
+%       load all other node
+%   角色系统,全局注册名称.
+%       node name conflict.
 
 % 其他信息
 %   获取各个节点OPT版本信息. router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).

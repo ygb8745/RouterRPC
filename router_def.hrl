@@ -20,12 +20,12 @@
     -define(log(_Level, _What), void).
 -endif.
 
--define(undef, undefined).
--define(router, router).
-
--define(time_to_del_ref, 100*1000).%100s
--define(time_to_update_router, 2000).%2s
--define(live_period_for_router_item, 10). % 每个路由项的生存周期.
+-define(undef,                          undefined).
+-define(router,                         router).
+-define(time_to_del_ref,                time_to_del_ref).
+-define(time_to_update_router,          time_to_update_router).
+-define(live_period_for_router_item,    live_period_for_router_item).
+-define(log_level,                      log_level).
 
 %% ============================================================================================
 %% Data type
@@ -36,8 +36,7 @@
     path_to_other = #{}, % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
                          % 这个map下所有作为key的node()就是全部的已知节点.
     help_pid,            % help process
-    log_level = 10       % log优先级数字小于等于此值得才会被处理.
-                         %      log优先级,数字越小优先级越高,最高为0.
+    config               % map #{}
 }).
 
 % 用法 用于作为router_map的一项: node() => #router_item{}
