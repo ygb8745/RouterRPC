@@ -27,12 +27,32 @@ update_router()->
     RouterMap = gen_server:call(?MODULE, {collect_router_request, [node()], Ref}),
     gen_server:cast(?MODULE, {update_router_info,RouterMap}).
 
+all_nodes()->
+    gen_server:call(router, get_all_nodes).
+
 set_log_level(Level)->
     gen_server:call(?MODULE,{update_config,#{?log_level => Level}}).
 
+set_role(Role)->
+    gen_server:call(?MODULE,{update_config, #{role => Role}}).% todo add role maco
+
+get_role()->
+    get_config(role).
+
+get_nodes_of_role(Role)->
+    AllNodes = all_nodes(),
+    %NodeRoles = [{Node, router_rpc:call(Node, ?MODULE, get_role, [])} || Node <- AllNodes],
+    lists:filter(fun(Node)->
+              router_rpc:call(Node, ?MODULE, get_role, []) == Role
+           end,
+           AllNodes).
+     
 update_config()->
     Config = read_config(),
     gen_server:call(?MODULE, {update_config, Config}).
+
+update_config(Key, Value)->
+    gen_server:call(?MODULE,{update_config, #{Key => Value}}).
 
 % -spec get_config(Key)-> {ok, Vlue} | error.
 get_config(Key)->
