@@ -30,11 +30,15 @@ update_router()->
 all_nodes()->
     gen_server:call(router, get_all_nodes).
 
+% spec get_path_to(Node)-> {ok, Path} | error.
+get_path_to(Node)->
+    gen_server:call(router, {get_path_to_other, Node}).
+
 set_log_level(Level)->
     gen_server:call(?MODULE,{update_config,#{?log_level => Level}}).
 
 set_role(Role)->
-    gen_server:call(?MODULE,{update_config, #{role => Role}}).% todo add role maco
+    gen_server:call(?MODULE,{update_config, #{?role => Role}}).
 
 % -spec get_role()-> Role.
 get_role()->
@@ -44,10 +48,11 @@ get_role()->
 get_nodes_of_role(Role)->
     AllNodes = all_nodes(),
     %NodeRoles = [{Node, router_rpc:call(Node, ?MODULE, get_role, [])} || Node <- AllNodes],
-    lists:filter(fun(Node)->
-              router_rpc:call(Node, ?MODULE, get_role, []) == Role
-           end,
-           AllNodes).
+    lists:filter(
+        fun(Node)->
+            router_rpc:call(Node, ?MODULE, get_role, []) == Role
+        end,
+        AllNodes).
 
 update_config(Key, Value)->
     gen_server:call(?MODULE,{update_config, #{Key => Value}}).

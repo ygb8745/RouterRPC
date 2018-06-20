@@ -21,7 +21,7 @@ cast(NodeOrPath,M,F,A)->
 
 %% trace router.
 tracert(Node)->
-    case gen_server:call(router, {get_path_to_other, Node}) of
+    case router:get_path_to(Node) of
         {ok, Path}->
             {_, Result} = lists:foldl(
                 fun(N,{PathAcc, ResAcc})->
@@ -54,7 +54,7 @@ commonRPC(Method, Path,M,F,A) when is_list(Path)->
         PathrLeft),
     erlang:apply(rpc, Method, ArgList);
 commonRPC(Method, Node,M,F,A)->
-    case gen_server:call(router, {get_path_to_other, Node}) of
+    case router:get_path_to(Node) of
         {ok, Path}->
             commonRPC(Method, Path, M, F, A);
         error ->

@@ -10,6 +10,6 @@ nl(Module)->
     code:purge(Module),
     code:load_file(Module),
     {Module, Binary, Filename} = code:get_object_code(Module),
-    AllNodes = gen_server:call(router, get_all_nodes),
+    AllNodes = router:all_nodes(),
     ResultList = router_rpc:multicall(AllNodes, code, load_binary, [Module, Filename, Binary]),
     lists:zip(AllNodes, ResultList).

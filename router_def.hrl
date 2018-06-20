@@ -21,6 +21,8 @@
 -endif.
 
 -define(undef,                          undefined).
+-define(true,                           true).
+-define(false,                          false).
 -define(router,                         router).
 -define(time_to_del_ref,                time_to_del_ref).
 -define(time_to_update_router,          time_to_update_router).
