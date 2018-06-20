@@ -27,6 +27,7 @@ update_router()->
     RouterMap = gen_server:call(?MODULE, {collect_router_request, [node()], Ref}),
     gen_server:cast(?MODULE, {update_router_info,RouterMap}).
 
+% 包括本节点
 all_nodes()->
     gen_server:call(router, get_all_nodes).
 
@@ -47,7 +48,6 @@ get_role()->
 
 get_nodes_of_role(Role)->
     AllNodes = all_nodes(),
-    %NodeRoles = [{Node, router_rpc:call(Node, ?MODULE, get_role, [])} || Node <- AllNodes],
     lists:filter(
         fun(Node)->
             router_rpc:call(Node, ?MODULE, get_role, []) == Role
@@ -311,7 +311,7 @@ read_config()->
         },
     maps:merge(DefaultConfigMap, UserConfigedMap).
 
-% -spec get_config_from_state(Key)-> {ok, Vlue} | error.
+% -spec get_config_from_state(Key, State)-> {ok, Vlue} | error.
 get_config_from_state(Key, #router_state{config = Config})->
     maps:find(Key, Config).
 
