@@ -26,6 +26,7 @@
 -define(time_to_update_router,          time_to_update_router).
 -define(live_period_for_router_item,    live_period_for_router_item).
 -define(log_level,                      log_level).
+-define(role,                           role).
 
 %% ============================================================================================
 %% Data type

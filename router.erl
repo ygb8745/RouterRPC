@@ -36,8 +36,10 @@ set_log_level(Level)->
 set_role(Role)->
     gen_server:call(?MODULE,{update_config, #{role => Role}}).% todo add role maco
 
+% -spec get_role()-> Role.
 get_role()->
-    get_config(role).
+    {ok, Role} = get_config(?role),
+    Role.
 
 get_nodes_of_role(Role)->
     AllNodes = all_nodes(),
@@ -46,13 +48,13 @@ get_nodes_of_role(Role)->
               router_rpc:call(Node, ?MODULE, get_role, []) == Role
            end,
            AllNodes).
-     
-update_config()->
-    Config = read_config(),
-    gen_server:call(?MODULE, {update_config, Config}).
 
 update_config(Key, Value)->
     gen_server:call(?MODULE,{update_config, #{Key => Value}}).
+
+update_config()->
+    Config = read_config(),
+    gen_server:call(?MODULE, {update_config, Config}).
 
 % -spec get_config(Key)-> {ok, Vlue} | error.
 get_config(Key)->
@@ -74,8 +76,8 @@ init(_Args) ->
     erlang:group_leader(whereis(init),self()),
     Pid = create_help_process(),
     Config = read_config(),
-    {ok, #router_state{help_pid = Pid,
-                       config = Config}}.%init返回 {ok, State} ，其中 State 是gen_server的内部状态。
+    %init返回 {ok, State} ，其中 State 是gen_server的内部状态。
+    {ok, #router_state{help_pid = Pid, config = Config}}.
 
 terminate(normal, _State) ->
     ok.
@@ -176,6 +178,10 @@ handle_cast(_Request, OldState) ->
     ?log(1, {"router.unhandle_cast:",{_Request, OldState}}),
     {noreply, OldState}.
 
+% handle_continue(continue_after_start, State)->
+%     Pid = create_help_process(),
+%     {noreply, State#router_state{help_pid = Pid}}.
+
 handle_info(Info,State)->
     ?log(1, {"router.unhandle_info:",Info}),
     {noreply, State}.
@@ -195,7 +201,6 @@ create_help_process()->
                 error -> 3000 % The first time.
             end,
             timer:sleep(SleepTime),
-            ?log({"help proc",self()}),
             AllNodesList = gen_server:call(?MODULE, get_all_nodes),
             lists:foreach(fun(N)->
                 net_adm:ping(N),
@@ -204,6 +209,7 @@ create_help_process()->
             end, AllNodesList),
             NewRouterMap = #{node() => #router_item{connected_list = nodes(),
                                                     timestamp = erlang:system_time(millisecond)}},
+            ?log({"help proc NewRouterMap:",NewRouterMap}),
             rpc:multicall(gen_server, cast,
                             [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]),
             Fun()
@@ -294,7 +300,9 @@ read_config()->
             ?live_period_for_router_item => 10,
             % 要显示log的最低等级
             % log优先级,数字越小优先级越高,最高为0.
-            ?log_level => 10
+            ?log_level => 10,
+            % 本节点role
+            ?role => ?undef
         },
     maps:merge(DefaultConfigMap, UserConfigedMap).
 
