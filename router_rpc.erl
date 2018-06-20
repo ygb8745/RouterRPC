@@ -10,8 +10,11 @@ multicall(M,F,A)->
     AllNodes = router:all_nodes(),
     multicall(AllNodes,M,F,A).
 multicall(Nodes,M,F,A)->
-    Fun = fun(Node) -> call(Node,M,F,A) end,
-    lists:map(Fun, Nodes).
+    [call(N,M,F,A) || N <- Nodes].
+
+role_call(Role,M,F,A)->
+    Nodes = router:get_nodes_of_role(Role),
+    [call(N,M,F,A) || N <- Nodes].
 
 cast(NodeOrPath,M,F,A)->
     commonRPC(cast, NodeOrPath,M,F,A).

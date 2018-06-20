@@ -167,7 +167,7 @@ handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
     {ok, InternalLevel} = get_config_from_state(?log_level, State),
     if Level =< InternalLevel ->
             io:format("=> ~p~n"
-                      "\t\t\t\t->log: N:~p P:~p M:~p L:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
+                      "\t\t\t\t->log: N:~p P:~p M:~p:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
         true -> void
     end,
     {noreply, State};
@@ -339,6 +339,7 @@ get_config_from_state(Key, #router_state{config = Config})->
 %   带有优先级的log系统.
 % 代码远程加载
 % 配置文件
+% 角色系统.
 
 % todo
 %   删除第一种路由逻辑.
@@ -349,8 +350,6 @@ get_config_from_state(Key, #router_state{config = Config})->
 %       从家目录读取.
 %           os:type() -> {Osfamily, Osname}
 %           os:getenv(VarName) -> Value | false     win:"USERPROFILE"  Lin:"HOME"
-%   角色系统,全局注册名称.
-%       node name conflict.
 %   通信加密.
 
 % 其他信息
