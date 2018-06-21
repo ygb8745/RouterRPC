@@ -288,7 +288,12 @@ read_config()->
     UserConfigedMap =
         try
             % todo: read from home dir.
-            {ok,[ConfigMap | _]} = file:consult("router.config"),
+            HomeDir = case os:type() of %{Osfamily, Osname}
+                {win32, _nt} -> os:getenv("USERPROFILE");
+                {unix, _linux} -> os:getenv("HOME")
+            end,
+            FilePath = filename:join(HomeDir, "router.config"),
+            {ok,[ConfigMap | _]} = file:consult(FilePath),
             ConfigMap
         catch
             T:P ->
@@ -351,12 +356,9 @@ get_config_from_state(Key, #router_state{config = Config})->
 %   io输出有冲突
 %   trace
 %   跨网段代理
-%   配置文件map读取
-%       从家目录读取.
-%           os:type() -> {Osfamily, Osname}
-%           os:getenv(VarName) -> Value | false     win:"USERPROFILE"  Lin:"HOME"
 %   通信加密.
 
 % 其他信息
 %   获取各个节点OPT版本信息:    router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).
+%                             maps:from_list([{N, router_rpc:call(N, erlang, system_info, [system_version])} || N<-router:all_nodes()]).
 %   load config to all other node:  router_rpc:multicall(gen_server, call, [router, {update_config, gen_server:call(router, get_config)}])
