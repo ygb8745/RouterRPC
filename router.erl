@@ -172,7 +172,7 @@ handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
     {ok, InternalLevel} = get_config_from_state(?log_level, State),
     if Level =< InternalLevel ->
             io:format("=> ~p~n"
-                      "\t\t\t\t->log: N:~p P:~p M:~p:~p T:~s~n",[What, Node, Pid, Module, Line, Time]);
+                      "\t\t\t\t->log:~p N:~p P:~p M:~p:~p T:~s~n",[What, Level, Node, Pid, Module, Line, Time]);
         true -> void
     end,
     {noreply, State};
@@ -287,11 +287,7 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->%PathMap
 read_config()->
     UserConfigedMap =
         try
-            % todo: read from home dir.
-            HomeDir = case os:type() of %{Osfamily, Osname}
-                {win32, _nt} -> os:getenv("USERPROFILE");
-                {unix, _linux} -> os:getenv("HOME")
-            end,
+            {ok,[[HomeDir]]} = init:get_argument(home),
             FilePath = filename:join(HomeDir, "router.config"),
             {ok,[ConfigMap | _]} = file:consult(FilePath),
             ConfigMap
@@ -302,12 +298,12 @@ read_config()->
         end,
     DefaultConfigMap =
         #{
-            %删除ref的时间.
+            %删除ref的时间. (ms)
             ?time_to_del_ref=> 100*1000,
-            % 更新路由信息的时间
-            ?time_to_update_router => 2*1000,
+            % 更新路由信息的时间 (ms)
+            ?time_to_update_router => 10*1000,
             % 每条路由生存周期.
-            ?live_period_for_router_item => 10,
+            ?live_period_for_router_item => 5,
             % 要显示log的最低等级
             % log优先级,数字越小优先级越高,最高为0.
             ?log_level => 10,
@@ -352,13 +348,15 @@ get_config_from_state(Key, #router_state{config = Config})->
 % 角色系统.
 
 % todo
-%   删除第一种路由逻辑.
-%   io输出有冲突
 %   trace
 %   跨网段代理
 %   通信加密.
 
 % 其他信息
-%   获取各个节点OPT版本信息:    router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).
-%                             maps:from_list([{N, router_rpc:call(N, erlang, system_info, [system_version])} || N<-router:all_nodes()]).
-%   load config to all other node:  router_rpc:multicall(gen_server, call, [router, {update_config, gen_server:call(router, get_config)}])
+%   获取各个节点OPT版本信息:
+%           router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).
+%           maps:from_list([{N, router_rpc:call(N, erlang, system_info, [system_version])} || N<-router:all_nodes()]).
+%   load config to all other node:
+%           router_rpc:multicall(gen_server, call, [router, {update_config, gen_server:call(router, get_config)}]).
+%   获取各个节点role:
+%           maps:from_list([{N, router_rpc:call(N, router, get_role, [])} || N<-router:all_nodes()]).
