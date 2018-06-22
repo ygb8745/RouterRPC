@@ -113,7 +113,7 @@ handle_call(get_all_router_items, _From, State) ->
 % -- to collect router info
 handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
     % KnowenNodeList :: [已知节点]
-    ?log({collect_router_request, KnowenNodeList, Ref}),
+    ?log(11,{collect_router_request, KnowenNodeList, Ref}),
     RouterMap =
         case get(Ref) of
             ?undef ->
@@ -121,7 +121,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
                 SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
                                                                  sets:from_list(KnowenNodeList))),
-                ?log({"SysUnKnowenNodeList", SysUnKnowenNodeList}),
+                ?log(11,{"SysUnKnowenNodeList", SysUnKnowenNodeList}),
                 {SysUnKnowenNodeRouterMapList, _BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
                                 [?MODULE, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
                 lists:foldl(
@@ -145,7 +145,7 @@ handle_call(Request, _From, OldState) ->
 
 handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State) ->
     % KnowenNodeList :: [已知节点]
-    ?log({update_router_item, NewRouterMap, KnowenNodeList, Ref}),
+    ?log(11, {update_router_item, NewRouterMap, KnowenNodeList, Ref}),
     NewState =
         case get(Ref) of
             ?undef ->
@@ -214,7 +214,7 @@ create_help_process()->
             end, AllNodesList),
             NewRouterMap = #{node() => #router_item{connected_list = nodes(),
                                                     timestamp = erlang:system_time(millisecond)}},
-            ?log({"help proc NewRouterMap:",NewRouterMap}),
+            ?log(11, {"help proc NewRouterMap:",NewRouterMap}),
             rpc:multicall(gen_server, cast,
                             [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]),
             Fun()
@@ -245,7 +245,7 @@ update_router_info(State, NewRouterMap)-> % NewState
             Result
         end,
         NewRouterMap1),
-    ?log({"update_router_info new:",NewRouterMap2}),
+    ?log(100, {"update_router_info new:",NewRouterMap2}),
     PathMap = find_path_for_all(NewRouterMap2),
     State#router_state{reouter_items = NewRouterMap2,
                        path_to_other = PathMap}.
@@ -275,7 +275,7 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->%PathMap
                             end, {PathMap,TQueue}, NodeListConnToThis);
                     error ->
                         % 没有该节点的直连节点列表信息,不能通过此节点向外扩展.
-                        ?log({"Router Item not found: node", Item}),
+                        ?log(11, {"Router Item not found, it may not have router proc.node:", Item}),
                         {PathMap,TQueue}
                 end,
             find_path_for_all_help(RouterMap, NewPathMap, NewQueue);
@@ -293,7 +293,7 @@ read_config()->
             ConfigMap
         catch
             T:P ->
-                ?log(9, {"Error when read config",T,P}),
+                ?log(9, {"Unable to read config",T,P}),
                 #{}
         end,
     DefaultConfigMap =

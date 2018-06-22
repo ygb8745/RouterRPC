@@ -5,7 +5,7 @@
 %% ============================================================================================
 
 -ifdef(DEBUG).
-    -define(log(What), ?log(11, What)).
+    -define(log(What), ?log(1, What)).
     -define(log(Level, What),
                 gen_server:cast(router,{log, {Level, What, node(), self(), ?MODULE,?LINE,format_timestamp()}})).
 
