@@ -79,7 +79,7 @@ show()->
 init(_Args) ->
     % Log在本地输出.
     erlang:group_leader(whereis(init),self()),
-    Pid = create_help_process(),
+    Pid = spawn_link(fun()-> help_process_loop() end),
     Config = read_config(),
     %init返回 {ok, State} ，其中 State 是gen_server的内部状态。
     {ok, #router_state{help_pid = Pid, config = Config}}.
@@ -184,7 +184,7 @@ handle_cast(_Request, OldState) ->
     {noreply, OldState}.
 
 % handle_continue(continue_after_start, State)->
-%     Pid = create_help_process(),
+%     Pid = spawn_link(fun()-> help_process_loop() end),
 %     {noreply, State#router_state{help_pid = Pid}}.
 
 handle_info(Info,State)->
@@ -199,28 +199,26 @@ code_change(_OldVsn, State, _Extra)->
 %% Internal Function
 %% ============================================================================================
 
-create_help_process()->
-    spawn_link(fun Fun()->
-            SleepTime = case get_config(?time_to_update_router) of
-                {ok, Value} -> Value;
-                error -> 1000 % The first time.
-            end,
-            timer:sleep(SleepTime),
-            NodesList1 = gen_server:call(?MODULE, get_all_nodes),
-            NodesList2 = maps:keys(gen_server:call(?MODULE, get_all_router_items)),
-            AllNodesList = lists:umerge(lists:usort(NodesList1),lists:usort(NodesList2)),
-            lists:foreach(fun(N)->
-                net_adm:ping(N),
-                % 尝试在各个节点启动router
-                router_rpc:cast(N, ?MODULE, start, [])
-            end, AllNodesList),
-            NewRouterMap = #{node() => #router_item{connected_list = nodes(),
-                                                    timestamp = erlang:system_time(millisecond)}},
-            ?log(11, {"This Node NewRouterItem:",NewRouterMap}),
-            rpc:multicall(gen_server, cast,
-                            [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]),
-            Fun()
-        end).
+help_process_loop()->
+    SleepTime = case get_config(?time_to_update_router) of
+        {ok, Value} -> Value;
+        error -> 1000 % The first time.
+    end,
+    timer:sleep(SleepTime),
+    NodesList1 = gen_server:call(?MODULE, get_all_nodes),
+    NodesList2 = maps:keys(gen_server:call(?MODULE, get_all_router_items)),
+    AllNodesList = lists:umerge(lists:usort(NodesList1),lists:usort(NodesList2)),
+    lists:foreach(fun(N)->
+        net_adm:ping(N),
+        % 尝试在各个节点启动router
+        router_rpc:cast(N, ?MODULE, start, [])
+    end, AllNodesList),
+    NewRouterMap = #{node() => #router_item{connected_list = nodes(),
+                                            timestamp = erlang:system_time(millisecond)}},
+    ?log(11, {"This Node NewRouterItem:",NewRouterMap}),
+    rpc:multicall(gen_server, cast,
+                    [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]),
+    help_process_loop().
 
 handle_ref(State, Ref)->
     put(Ref, true),
@@ -339,7 +337,7 @@ get_config_from_state(Key, #router_state{config = Config})->
 %           当本节点的nodes()表和State中的本节点路由项不同时就 1.更新自己的路由信息和path表 2.向其他节点广播自己的新变化
 %           其他节点收到新路由项后做 1.更新自己的路由信息和path表 2.向未知节点广播路由变化 3.X尝试ping所有节点,检查自己是否有路由信息变化.
 %           目前和此路由相关的主要有函数:
-%               create_help_process()
+%               help_process_loop()
 %               handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State)
 %               *update_router_info(State, NewRouterMap)
 %
