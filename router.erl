@@ -203,10 +203,12 @@ create_help_process()->
     spawn_link(fun Fun()->
             SleepTime = case get_config(?time_to_update_router) of
                 {ok, Value} -> Value;
-                error -> 3000 % The first time.
+                error -> 1000 % The first time.
             end,
             timer:sleep(SleepTime),
-            AllNodesList = gen_server:call(?MODULE, get_all_nodes),
+            NodesList1 = gen_server:call(?MODULE, get_all_nodes),
+            NodesList2 = maps:keys(gen_server:call(?MODULE, get_all_router_items)),
+            AllNodesList = lists:umerge(lists:usort(NodesList1),lists:usort(NodesList2)),
             lists:foreach(fun(N)->
                 net_adm:ping(N),
                 % 尝试在各个节点启动router
@@ -214,7 +216,7 @@ create_help_process()->
             end, AllNodesList),
             NewRouterMap = #{node() => #router_item{connected_list = nodes(),
                                                     timestamp = erlang:system_time(millisecond)}},
-            ?log(11, {"help proc NewRouterMap:",NewRouterMap}),
+            ?log(11, {"This Node NewRouterItem:",NewRouterMap}),
             rpc:multicall(gen_server, cast,
                             [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]),
             Fun()
@@ -354,7 +356,6 @@ get_config_from_state(Key, #router_state{config = Config})->
 
 % 其他信息
 %   获取各个节点OPT版本信息:
-%           router_rpc:multicall(erlang, apply, [fun()-> {node(), erlang:system_info(system_version)} end,[]]).
 %           maps:from_list([{N, router_rpc:call(N, erlang, system_info, [system_version])} || N<-router:all_nodes()]).
 %   load config to all other node:
 %           router_rpc:multicall(gen_server, call, [router, {update_config, gen_server:call(router, get_config)}]).
