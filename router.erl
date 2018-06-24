@@ -208,11 +208,8 @@ help_process_loop()->
     NodesList1 = gen_server:call(?MODULE, get_all_nodes),
     NodesList2 = maps:keys(gen_server:call(?MODULE, get_all_router_items)),
     AllNodesList = lists:umerge(lists:usort(NodesList1),lists:usort(NodesList2)),
-    lists:foreach(fun(N)->
-        net_adm:ping(N),
-        % 尝试在各个节点启动router
-        router_rpc:cast(N, ?MODULE, start, [])
-    end, AllNodesList),
+    lists:foreach(fun(N)-> net_adm:ping(N) end, AllNodesList),
+    lists:foreach(fun(N)-> rpc:cast(N, ?MODULE, start, []) end, nodes()),
     NewRouterMap = #{node() => #router_item{connected_list = nodes(),
                                             timestamp = erlang:system_time(millisecond)}},
     ?log(11, {"This Node NewRouterItem:",NewRouterMap}),
