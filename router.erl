@@ -348,11 +348,3 @@ get_config_from_state(Key, #router_state{config = Config})->
 %   trace
 %   跨网段代理
 %   通信加密.
-
-% 其他信息
-%   获取各个节点OPT版本信息:
-%           maps:from_list([{N, router_rpc:call(N, erlang, system_info, [system_version])} || N<-router:all_nodes()]).
-%   load config to all other node:
-%           router_rpc:multicall(gen_server, call, [router, {update_config, gen_server:call(router, get_config)}]).
-%   获取各个节点role:
-%           maps:from_list([{N, router_rpc:call(N, router, get_role, [])} || N<-router:all_nodes()]).
