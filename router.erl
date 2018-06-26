@@ -119,8 +119,7 @@ handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
             ?undef ->
                 handle_ref(State, Ref),
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
-                SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
-                                                                 sets:from_list(KnowenNodeList))),
+                SysUnKnowenNodeList = nodes() -- KnowenNodeList,
                 ?log(11,{"SysUnKnowenNodeList", SysUnKnowenNodeList}),
                 {SysUnKnowenNodeRouterMapList, _BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
                                 [?MODULE, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
@@ -151,8 +150,7 @@ handle_cast({update_router_item, NewRouterMap, KnowenNodeList, Ref}, State) ->
             ?undef ->
                 handle_ref(State, Ref),
                 % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
-                SysUnKnowenNodeList = sets:to_list(sets:subtract(sets:from_list(nodes()),
-                                                                 sets:from_list(KnowenNodeList))),
+                SysUnKnowenNodeList = nodes() -- KnowenNodeList,
                 rpc:multicall(SysUnKnowenNodeList, gen_server, cast,
                                 [router, {update_router_item, NewRouterMap, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
                 % 更新本地路由信息
