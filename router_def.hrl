@@ -13,7 +13,7 @@
         {_,_,Micro} = os:timestamp(),
         {{_Year,_Month,_Day},{Hour,Minute,Second}} =
             calendar:local_time(),
-        io_lib:format("~p-~p-~p ~p:~p:~p.~p",
+        io_lib:format("~4w-~2.2.0w-~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w.~p",
                         [_Year,_Month,_Day,Hour,Minute,Second,Micro]).
 -else.
     -define(log(_What), void).
