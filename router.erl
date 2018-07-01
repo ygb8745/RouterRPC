@@ -250,9 +250,8 @@ update_router_info(State, NewRouterMap)-> % NewState
     % 过滤掉太老的路由项.
     NewRouterMap2 = maps:filter(
         fun(Node, #router_item{timestamp = Timestamp})->
-            {ok, LivePeriod} = get_config_from_state(?live_period_for_router_item, State),
-            {ok, TimeToUpdateRouter} = get_config_from_state(?time_to_update_router, State),
-            LegalTime = erlang:system_time(millisecond) - LivePeriod * TimeToUpdateRouter,
+            {ok, TimeToDelRouter} = get_config_from_state(?time_to_del_router_item, State),
+            LegalTime = erlang:system_time(millisecond) - TimeToDelRouter,
             Result = Timestamp > LegalTime,
             case Result of
                 true -> do_nothing;
@@ -319,7 +318,7 @@ read_config()->
             % 更新路由信息的时间 (ms)
             ?time_to_update_router => 10*1000,
             % 每条路由生存周期.
-            ?live_period_for_router_item => 5,
+            ?time_to_del_router_item => 50*1000,
             % 要显示log的最低等级
             % log优先级,数字越小优先级越高,最高为0.
             ?log_level => 10,
