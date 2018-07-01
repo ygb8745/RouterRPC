@@ -81,6 +81,7 @@ init(_Args) ->
     erlang:group_leader(whereis(init),self()),
     Pid = spawn_link(fun()-> help_process_loop() end),
     Config = read_config(),
+    ok = net_kernel:monitor_nodes(true),
     %init返回 {ok, State} ，其中 State 是gen_server的内部状态。
     {ok, #router_state{help_pid = Pid, config = Config}}.
 
@@ -185,6 +186,14 @@ handle_cast(_Request, OldState) ->
 %     Pid = spawn_link(fun()-> help_process_loop() end),
 %     {noreply, State#router_state{help_pid = Pid}}.
 
+handle_info({nodeup, Node},State)->
+    ?log(1, {nodeup, Node}),
+    cast_router_info(),
+    {noreply, State};
+handle_info({nodedown, Node},State)->
+    ?log(1, {nodedown, Node}),
+    cast_router_info(),
+    {noreply, State};
 handle_info(Info,State)->
     ?log(1, {"router.unhandle_info:",Info}),
     {noreply, State}.
@@ -207,13 +216,25 @@ help_process_loop()->
     NodesList2 = maps:keys(gen_server:call(?MODULE, get_all_router_items)),
     AllNodesList = lists:umerge(lists:usort(NodesList1),lists:usort(NodesList2)),
     lists:foreach(fun(N)-> net_adm:ping(N) end, AllNodesList),
-    lists:foreach(fun(N)-> rpc:cast(N, ?MODULE, start, []) end, nodes()),
+    lists:foreach(
+        fun(N)->
+            case rpc:call(N, code, which, [?MODULE]) of
+                non_existing -> do_nothing;
+                _ -> rpc:cast(N, ?MODULE, start, [])
+
+            end
+        end,
+        nodes()),
+    cast_router_info(),
+    % for code change.动态链接至运行时代码
+    ?MODULE:help_process_loop().
+
+cast_router_info()->
     NewRouterMap = #{node() => #router_item{connected_list = nodes(),
                                             timestamp = erlang:system_time(millisecond)}},
     ?log(11, {"This Node NewRouterItem:",NewRouterMap}),
     rpc:multicall(gen_server, cast,
-                    [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]),
-    help_process_loop().
+                    [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]).
 
 handle_ref(State, Ref)->
     put(Ref, true),
@@ -346,3 +367,4 @@ get_config_from_state(Key, #router_state{config = Config})->
 %   trace
 %   跨网段代理
 %   通信加密.
+%
