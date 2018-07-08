@@ -338,7 +338,7 @@ get_config_from_state(Key, #router_state{config = Config})->
 %           这个的过程是,本节点调用update_router()向本节点发出call({collect_router_request, KnowenNodeList, Ref} 开始本过程
 %           向全网其他节点发出call({collect_router_request, KnowenNodeList, Ref}
 %           全网的节点都回答收集的路由信息汇总到update_router()然后调用gen_server:cast(router, {update_router_info,RouterMap})更新本节点的信息.
-%           --有一定的死锁风险,当两个节点同时call对方时就会产生死锁.
+%%          TODO: spawn to avoid lock
 %           目前和此路由相关的主要有函数:
 %               update_router()
 %               handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State)
