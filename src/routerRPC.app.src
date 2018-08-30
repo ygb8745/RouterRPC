@@ -1,5 +1,5 @@
 {application, routerRPC,
- [{description, "An OTP application"},
+ [{description, "RouterRPC: Nodes interconnection in non-fully connected networks."},
   {vsn, "0.1.0"},
   {registered, []},
   {mod, { routerRPC_app, []}},
