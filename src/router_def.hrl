@@ -34,14 +34,6 @@
 %% Data type
 %% ============================================================================================
 
--record(router_state,{
-    reouter_items = #{}, % #{node_name() => #router_item{}}
-    path_to_other = #{}, % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
-                         % 这个map下所有作为key的node()就是全部的已知节点.
-    help_pid,            % help process
-    config               % map #{}
-}).
-
 % 用法 用于作为router_map的一项: node() => #router_item{}
 % -type router_map() = #{node_name() => #router_item{}}.
 % -type path_map() =   #{node_name() => [_Path_to_this_node = node_name()]}.
