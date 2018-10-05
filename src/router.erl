@@ -16,12 +16,8 @@
 %% ============================================================================================
 %% API Function
 %% ============================================================================================
-start() ->
-    gen_server:start({local, ?MODULE},%本地注册为?MODULE ,也可以通过whereis()函数来获得pid.
-                          ?MODULE,%回调模块的名字
-                          [],%给init函数的参数
-                          []).%是参数的列表。具体的参数请查看 gen_server(3) 。
 start_link() ->
+    error_logger:info_msg("Starting router...\n"),
     gen_server:start_link({local, ?MODULE},%本地注册为?MODULE ,也可以通过whereis()函数来获得pid.
                           ?MODULE,%回调模块的名字
                           [],%给init函数的参数
@@ -94,6 +90,7 @@ init(_Args) ->
     {ok, #router_state{help_pid = Pid, config = Config}}.
 
 terminate(normal, _State) ->
+    error_logger:info_msg("Stoping router...\n"),
     ok.
 
 handle_call(get_state, _From, State) ->
