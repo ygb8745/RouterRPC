@@ -169,9 +169,6 @@ handle_cast({update_router_info,NewRouterMap}, State) ->
     NewState = update_router_info(State, NewRouterMap),
     {noreply, NewState};
 
-handle_cast({del_ref, Ref}, State) ->
-    erase(Ref),
-    {noreply, State};
 handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
     {ok, InternalLevel} = get_config_from_state(?log_level, State),
     if Level =< InternalLevel ->
@@ -198,6 +195,9 @@ handle_info({nodeup, Node},State)->
 handle_info({nodedown, Node},State)->
     ?log(1, {nodedown, Node}),
     cast_router_info(),
+    {noreply, State};
+handle_info({timeout, _TimerRef, {del_ref, Ref}},State)->
+    erase(Ref),
     {noreply, State};
 handle_info(Info,State)->
     ?log(1, {"router.unhandle_info:",Info}),
@@ -242,12 +242,9 @@ cast_router_info()->
                     [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]).
 
 handle_ref(State, Ref)->
-    put(Ref, true),
-    spawn(fun()->
-        {ok, TimeToDelRef} = get_config_from_state(?time_to_del_ref, State),
-        timer:sleep(TimeToDelRef),
-        gen_server:cast(?MODULE,{del_ref, Ref})
-    end).
+    put(Ref, ref),
+    {ok, TimeToDelRef} = get_config_from_state(?time_to_del_ref, State),
+    erlang:start_timer(TimeToDelRef, self(), {del_ref, Ref}).
 
 update_router_info(State, NewRouterMap)-> % NewState
     OldRouterMap = State#router_state.reouter_items,
@@ -368,7 +365,5 @@ get_config_from_state(Key, #router_state{config = Config})->
 % 角色系统.
 
 % todo
-%   trace
-%   跨网段代理
 %   通信加密.
 %
