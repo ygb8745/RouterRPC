@@ -277,22 +277,23 @@ find_path_for_all(RouterMap)->%PathMap
 
 find_path_for_all_help(RouterMap, PathMap, Queue)->%PathMap
     case queue:out(Queue) of
-        {{value, Item}, TQueue} ->
+        {{value, Node}, TQueue} ->
             {NewPathMap,NewQueue} =
-                case maps:find(Item, RouterMap) of
-                    {ok, #router_item{connected_list = NodeListConnToThis}} ->
+                case RouterMap of
+                    #{Node := #router_item{connected_list = NodeListConnToThis}} ->
+                        #{Node := PathToThisNode} = PathMap,
                         lists:foldl(
                             fun(N,{AccPathMap,AccQueue})->
                                 case maps:is_key(N, AccPathMap) of
                                     true->
                                         {AccPathMap,AccQueue}; % N 节点已经在PathMap中了
                                     false->
-                                        {AccPathMap#{N => maps:get(Item, PathMap) ++ [N]}, queue:in(N, AccQueue)}
+                                        {AccPathMap#{N => PathToThisNode ++ [N]}, queue:in(N, AccQueue)}
                                 end
                             end, {PathMap,TQueue}, NodeListConnToThis);
-                    error ->
+                    _ ->
                         % 没有该节点的直连节点列表信息,不能通过此节点向外扩展.
-                        ?log(11, {"Router Item not found, it may not have router proc.node:", Item}),
+                        ?log(11, {"Router Item not found, it may not have router proc.node:", Node}),
                         {PathMap,TQueue}
                 end,
             find_path_for_all_help(RouterMap, NewPathMap, NewQueue);
