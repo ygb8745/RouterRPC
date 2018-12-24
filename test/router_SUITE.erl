@@ -12,7 +12,7 @@
 -compile(nowarn_export_all).
 
 -include_lib("eunit/include/eunit.hrl").
--include("../include/router_def.hrl").
+-include("../src/router_def.hrl").
 
 % fun should end with  _test()
 find_path_for_all_test() ->
