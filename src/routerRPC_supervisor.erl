@@ -3,7 +3,7 @@
 -compile(export_all).
 
 start_link() ->
-    supervisor:start_link(routerRPC_supervisor, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init(_Args) ->
     {ok,
