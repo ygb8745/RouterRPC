@@ -33,11 +33,11 @@ update_router()->
 
 % 包括本节点
 all_nodes()->
-    gen_server:call(router, get_all_nodes).
+    gen_server:call(?MODULE, get_all_nodes).
 
 % spec get_path_to(Node)-> {ok, Path} | error.
 get_path_to(Node)->
-    gen_server:call(router, {get_path_to_other, Node}).
+    gen_server:call(?MODULE, {get_path_to_other, Node}).
 
 set_log_level(Level)->
     gen_server:call(?MODULE,{update_config,#{?log_level => Level}}).
@@ -184,10 +184,6 @@ handle_cast(_Request, OldState) ->
     ?log(1, {"router.unhandle_cast:",{_Request, OldState}}),
     {noreply, OldState}.
 
-% handle_continue(continue_after_start, State)->
-%     Pid = spawn_link(fun()-> help_process_loop() end),
-%     {noreply, State#router_state{help_pid = Pid}}.
-
 handle_info({nodeup, Node},State)->
     ?log(1, {nodeup, Node}),
     cast_router_info(),
@@ -212,13 +208,9 @@ code_change(_OldVsn, State, _Extra)->
 %% ============================================================================================
 
 help_process_loop() ->
-    SleepTime =
-        case get_config(?time_to_update_router) of
-            {ok, Value} -> Value;
-            error -> 1000 % The first time.
-        end,
+    {ok, SleepTime} = get_config(?time_to_update_router),
     timer:sleep(SleepTime),
-    NodesList1 = gen_server:call(?MODULE, get_all_nodes),
+    NodesList1 = all_nodes(),
     NodesList2 = maps:keys(gen_server:call(?MODULE, get_all_router_items)),
     AllNodesList = lists:umerge(lists:usort(NodesList1), lists:usort(NodesList2)),
     get_config(?automatically_connect) == {ok, ?true} andalso
