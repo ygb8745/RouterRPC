@@ -290,7 +290,7 @@ find_path_for_all_help(RouterMap, PathMap, Queue)->%PathMap
 
 % -spec read_config()-> ConfigMap
 read_config()->
-    UserConfigedMap =
+    UserConfigMap =
         try
             {ok,[[HomeDir]]} = init:get_argument(home),
             FilePath = filename:join(HomeDir, "router.config"),
@@ -319,9 +319,9 @@ read_config()->
             % 尝试连接所有已知节点
             ?automatically_connect => ?true
         },
-    maps:merge(DefaultConfigMap, UserConfigedMap).
+    maps:merge(DefaultConfigMap, UserConfigMap).
 
-% -spec get_config_from_state(Key, State)-> {ok, Vlue} | error.
+% -spec get_config_from_state(Key, State)-> {ok, Value} | error.
 get_config_from_state(Key, #router_state{config = Config})->
     maps:find(Key, Config).
 
@@ -358,4 +358,4 @@ get_config_from_state(Key, #router_state{config = Config})->
 
 % todo
 %   通信加密.
-%
+% use map instead of record
