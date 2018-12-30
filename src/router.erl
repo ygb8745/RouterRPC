@@ -65,7 +65,7 @@ update_config()->
     Config = read_config(),
     gen_server:call(?MODULE, {update_config, Config}).
 
-% -spec get_config(Key)-> {ok, Vlue} | error.
+-spec get_config(_Key)-> {ok, _Value} | error.
 get_config(Key)->
     gen_server:call(?MODULE, {get_config, Key}).
 
@@ -211,25 +211,20 @@ code_change(_OldVsn, State, _Extra)->
 %% Internal Function
 %% ============================================================================================
 
-help_process_loop()->
-    SleepTime = case get_config(?time_to_update_router) of
-        {ok, Value} -> Value;
-        error -> 1000 % The first time.
-    end,
+help_process_loop() ->
+    SleepTime =
+        case get_config(?time_to_update_router) of
+            {ok, Value} -> Value;
+            error -> 1000 % The first time.
+        end,
     timer:sleep(SleepTime),
     NodesList1 = gen_server:call(?MODULE, get_all_nodes),
     NodesList2 = maps:keys(gen_server:call(?MODULE, get_all_router_items)),
-    AllNodesList = lists:umerge(lists:usort(NodesList1),lists:usort(NodesList2)),
-    lists:foreach(fun(N)-> net_adm:ping(N) end, AllNodesList),
-    lists:foreach(
-        fun(N)->
-            case rpc:call(N, code, which, [?MODULE]) of
-                non_existing -> do_nothing;
-                _ -> rpc:cast(N, ?MODULE, start, [])
-
-            end
-        end,
-        nodes()),
+    AllNodesList = lists:umerge(lists:usort(NodesList1), lists:usort(NodesList2)),
+    get_config(?automatically_connect) == {ok, ?true} andalso
+        spawn(fun() -> [net_adm:ping(N) || N <- AllNodesList] end),
+    get_config(?infect_others) == {ok, ?true} andalso
+        [rpc:cast(N, application, start, [?APP_NAME]) || N <- nodes()],
     cast_router_info(),
     % for code change.动态链接至运行时代码
     ?MODULE:help_process_loop().
@@ -326,7 +321,11 @@ read_config()->
             % log优先级,数字越小优先级越高,最高为0.
             ?log_level => 10,
             % 本节点role
-            ?role => ?undef
+            ?role => ?undef,
+            % 尝试在其他节点启动本应用
+            ?infect_others => ?true,
+            % 尝试连接所有已知节点
+            ?automatically_connect => ?true
         },
     maps:merge(DefaultConfigMap, UserConfigedMap).
 

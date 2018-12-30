@@ -24,11 +24,14 @@
 -define(true,                           true).
 -define(false,                          false).
 -define(router,                         router).
+-define(APP_NAME,                       routerRPC).
 -define(time_to_del_ref,                time_to_del_ref).
 -define(time_to_update_router,          time_to_update_router).
 -define(time_to_del_router_item,        time_to_del_router_item).
 -define(log_level,                      log_level).
 -define(role,                           role).
+-define(infect_others,                  infect_others).
+-define(automatically_connect,          automatically_connect).
 
 %% ============================================================================================
 %% Data type
