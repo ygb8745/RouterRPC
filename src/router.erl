@@ -169,11 +169,11 @@ handle_cast({update_router_info,NewRouterMap}, State) ->
     NewState = update_router_info(State, NewRouterMap),
     {noreply, NewState};
 
-handle_cast({log, {Level, What, Node, Pid, Module, Line, Time}}, State)->
+handle_cast({log, {Level, What, Node, Pid, Module, Fun, Line, Time}}, State)->
     {ok, InternalLevel} = get_config_from_state(?log_level, State),
     if Level =< InternalLevel ->
             io:format("=> ~p~n"
-                      "\t\t\t\t->log:~p N:~p P:~p M:~p:~p T:~s~n",[What, Level, Node, Pid, Module, Line, Time]);
+                      "\t\t\t\t->log:~p N:~p P:~p M:~p:~p - ~p T:~s~n",[What, Level, Node, Pid, Module, Fun, Line, Time]);
         true -> void
     end,
     {noreply, State};

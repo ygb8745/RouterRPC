@@ -7,7 +7,7 @@
 -ifdef(DEBUG).
     -define(log(What), ?log(1, What)).
     -define(log(Level, What),
-                gen_server:cast(router,{log, {Level, What, node(), self(), ?MODULE,?LINE,format_timestamp()}})).
+                gen_server:cast(router,{log, {Level, What, node(), self(), ?MODULE, ?FUNCTION_NAME, ?LINE,format_timestamp()}})).
 
     format_timestamp() ->
         {_,_,Micro} = os:timestamp(),
