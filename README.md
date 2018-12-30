@@ -1,7 +1,13 @@
 routerRPC
 =====
 
-Erlang RouterRPC: Nodes interconnection in non-fully connected networks.
+Erlang RouterRPC: RPC for non-fully connected networks .
+
+        A -- B
+        |    |
+        C -- D
+        |  \
+        E    F
 
 ## Build
 -----
