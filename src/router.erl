@@ -5,13 +5,20 @@
 
 -include("router_def.hrl").
 
--record(router_state,{
-    reouter_items = #{}, % #{node_name() => #router_item{}}
-    path_to_other = #{}, % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
-                         % 这个map下所有作为key的node()就是全部的已知节点.
-    help_pid,            % help process
-    config               % map #{}
-}).
+-define(router_items, router_items).
+-define(path_to_other, path_to_other).
+-define(help_pid, help_pid).
+-define(config, config).
+
+-define(init_router_state,
+    #{
+        ?router_items => #{}, % #{node_name() => #router_item{}}
+        % 每条记录是到达其他节点的路径: 节点名->[到达该节点的路径列表]
+        % 这个map下所有作为key的node()就是全部的已知节点.
+        ?path_to_other => #{},
+        ?help_pid => ?undef,            % help process
+        ?config => #{}               % map #{}
+    }).
 
 %% ============================================================================================
 %% API Function
@@ -72,10 +79,10 @@ get_config(Key)->
 show()->
     State = gen_server:call(?MODULE, get_state),
     {"This Node:",      node(),
-     "Route tab:",      State#router_state.reouter_items,
-     "Path to other:",  State#router_state.path_to_other,
-     "help pid:",       State#router_state.help_pid,
-     "Config:",         State#router_state.config}.
+     "Route tab:",      maps:get(?router_items,  State),
+     "Path to other:",  maps:get(?path_to_other, State),
+     "help pid:",       maps:get(?help_pid,      State),
+     "Config:",         maps:get(?config,        State)}.
 
 %% ============================================================================================
 %% gen_server Function
@@ -87,7 +94,8 @@ init(_Args) ->
     Config = read_config(),
     ok = net_kernel:monitor_nodes(true),
     %init返回 {ok, State} ，其中 State 是gen_server的内部状态。
-    {ok, #router_state{help_pid = Pid, config = Config}}.
+    {ok, ?init_router_state#{?help_pid := Pid,
+                             ?config := Config}}.
 
 terminate(normal, _State) ->
     error_logger:info_msg("Stoping router...\n"),
@@ -98,23 +106,23 @@ handle_call(get_state, _From, State) ->
     {reply, State, State};
 
 % -- for config
-handle_call({update_config, NewConfig}, _From, #router_state{config = OldConfig} = State) ->
-    {reply, ok, State#router_state{config = maps:merge(OldConfig, NewConfig)}};
-handle_call(get_config, _From, #router_state{config = Config} = State) ->% ConfigMap
+handle_call({update_config, NewConfig}, _From, #{?config := OldConfig} = State) ->
+    {reply, ok, State#{?config := maps:merge(OldConfig, NewConfig)}};
+handle_call(get_config, _From, #{?config := Config} = State) ->% ConfigMap
     {reply, Config, State};
-handle_call({get_config, Key}, _From, #router_state{config = Config} = State) ->% {ok, Value} | error.
+handle_call({get_config, Key}, _From, #{?config := Config} = State) ->% {ok, Value} | error.
     Reply = maps:find(Key, Config),
     {reply, Reply, State};
 
 % -- to get router info
 handle_call(get_all_nodes, _From, State) ->
-    AllNodesList = maps:keys(State#router_state.path_to_other),
+    AllNodesList = maps:keys(maps:get(?path_to_other, State)),
     {reply, AllNodesList, State};
 handle_call({get_path_to_other, Node}, _From, State) ->
-    Path = maps:find(Node, State#router_state.path_to_other),
+    Path = maps:find(Node, maps:get(?path_to_other, State)),
     {reply, Path, State};
 handle_call(get_all_router_items, _From, State) ->
-    {reply, State#router_state.reouter_items, State};
+    {reply, maps:get(?router_items, State), State};
 
 % -- to collect router info
 handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
@@ -234,7 +242,7 @@ handle_ref(State, Ref)->
     erlang:start_timer(TimeToDelRef, self(), {del_ref, Ref}).
 
 update_router_info(State, NewRouterMap)-> % NewState
-    OldRouterMap = State#router_state.reouter_items,
+    #{?router_items := OldRouterMap} = State,
     NewRouterMap1 = maps:merge(OldRouterMap, NewRouterMap),% the value in Map1 is superseded by the value in Map2
     % 过滤掉太老的路由项.
     NewRouterMap2 = maps:filter(
@@ -251,8 +259,8 @@ update_router_info(State, NewRouterMap)-> % NewState
         NewRouterMap1),
     ?log(100, {"update_router_info new:",NewRouterMap2}),
     PathMap = find_path_for_all(NewRouterMap2),
-    State#router_state{reouter_items = NewRouterMap2,
-                       path_to_other = PathMap}.
+    State#{?router_items := NewRouterMap2,
+           ?path_to_other := PathMap}.
 
 find_path_for_all(RouterMap)->%PathMap
     Nodes = [node()|nodes()],
@@ -322,7 +330,7 @@ read_config()->
     maps:merge(DefaultConfigMap, UserConfigMap).
 
 % -spec get_config_from_state(Key, State)-> {ok, Value} | error.
-get_config_from_state(Key, #router_state{config = Config})->
+get_config_from_state(Key, #{?config := Config} = _State)->
     maps:find(Key, Config).
 
 % doc
@@ -358,4 +366,3 @@ get_config_from_state(Key, #router_state{config = Config})->
 
 % todo
 %   通信加密.
-% use map instead of record
