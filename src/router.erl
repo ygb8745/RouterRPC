@@ -173,9 +173,9 @@ handle_cast({update_router_item, NewRouterMap, KnownNodeList, Ref}, State) ->
                 State % ignore 已经处理过这个请求
         end,
     {noreply, NewState};
-handle_cast({update_router_info,NewRouterMap}, State) ->
-    NewState = update_router_info(State, NewRouterMap),
-    {noreply, NewState};
+%%handle_cast({update_router_info,NewRouterMap}, State) ->
+%%    NewState = update_router_info(State, NewRouterMap),
+%%    {noreply, NewState};
 
 handle_cast({log, {Level, What, Node, Pid, Module, Fun, Line, Time}}, State)->
     {ok, LevelThreshold} = get_config_from_state(?log_level, State),
