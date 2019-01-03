@@ -236,8 +236,7 @@ cast_router_info()->
     NewRouterMap = #{node() => #router_item{connected_list = nodes(),
                                             timestamp = erlang:system_time(millisecond)}},
     ?log(11, {"This Node NewRouterItem:",NewRouterMap}),
-    rpc:multicall(gen_server, cast,
-                    [?MODULE, {update_router_item, NewRouterMap, [node()|nodes()], erlang:make_ref()}]).
+    gen_server:cast(?MODULE, {update_router_item, NewRouterMap, [node()], erlang:make_ref()}).
 
 handle_ref(State, Ref)->
     put(Ref, ref),

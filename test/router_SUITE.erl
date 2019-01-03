@@ -37,7 +37,7 @@ find_path_for_all_test() ->
         {_Input3 = #{
             node() => #router_item{connected_list = [node_a,node_b]},
             node_a => #router_item{connected_list = [node_c]},
-            node_b => #router_item{connected_list = []},
+            node_b => #router_item{connected_list = [node_c]},
             node_c => #router_item{connected_list = []}},
             _Output3 = #{
                 nonode@nohost => [nonode@nohost],
@@ -57,3 +57,11 @@ find_path_for_all_test() ->
         end,
         TestList
     ).
+
+%%todo:
+%%    测试router 收到 update_router_item消息后的行为
+%%    检查点:
+%%        1.内部状态
+%%            可通过sys:get_status来获得
+%%        2.向外发出的消息
+%%            要通过trace XXX
