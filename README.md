@@ -1,6 +1,8 @@
 routerRPC
 =====
 
+[![Build Status](https://travis-ci.org/ygb8745/RouterRPC.svg?branch=master)](https://travis-ci.org/ygb8745/RouterRPC)
+
 Erlang RouterRPC: RPC for non-fully connected networks .
 
         A -- B
