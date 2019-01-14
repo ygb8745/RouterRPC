@@ -67,16 +67,11 @@ start_link() ->
 stop() ->
     gen_server:cast(?MODULE, stop).
 
-%%update_router()->
-%%    Ref = erlang:make_ref(),
-%%    RouterMap = gen_server:call(?MODULE, {collect_router_request, [node()], Ref}),
-%%    gen_server:cast(?MODULE, {update_router_info,RouterMap}).
-
 % 包括本节点
 all_nodes()->
     gen_server:call(?MODULE, get_all_nodes).
 
-% spec get_path_to(Node)-> {ok, Path} | error.
+-spec get_path_to(Node :: atom())-> {ok, Path :: list()} | error.
 get_path_to(Node)->
     gen_server:call(?MODULE, {get_path_to_other, Node}).
 
@@ -158,34 +153,6 @@ handle_call({get_path_to_other, Node}, _From, State) ->
 handle_call(get_all_router_items, _From, State) ->
     {reply, maps:get(?router_items, State), State};
 
-%%% -- to collect router info
-%%handle_call({collect_router_request, KnowenNodeList, Ref}, _From, State) ->
-%%    % KnowenNodeList :: [已知节点]
-%%    ?log(11,{collect_router_request, KnowenNodeList, Ref}),
-%%    RouterMap =
-%%        case get(Ref) of
-%%            ?undef ->
-%%                handle_ref(State, Ref),
-%%                % 检查与自己连接的节点是不是都在 KnowenNodeList中,如果有未知节点就向未知节点也发信.
-%%                SysUnKnowenNodeList = nodes() -- KnowenNodeList,
-%%                ?log(11,{"SysUnKnowenNodeList", SysUnKnowenNodeList}),
-%%                {SysUnKnowenNodeRouterMapList, _BadNodes} = rpc:multicall(SysUnKnowenNodeList, gen_server, call,
-%%                                [?MODULE, {collect_router_request, KnowenNodeList ++ SysUnKnowenNodeList, Ref}]),
-%%                lists:foldl(
-%%                    fun(RouterMap, Acc) when is_map(RouterMap)->
-%%                            maps:merge(RouterMap, Acc);
-%%                       (BadRouterMap, Acc) ->
-%%                            ?log(9, {"BadRouterItem:",BadRouterMap}),
-%%                            Acc
-%%                    end,
-%%                    #{node() => #router_item{connected_list = nodes(),
-%%                                             timestamp = erlang:system_time(millisecond)} }, %本节点直连点.
-%%                    SysUnKnowenNodeRouterMapList);
-%%            _ ->
-%%                #{} % ignore 已经处理过这个router请求了
-%%        end,
-%%    {reply, RouterMap, State};
-
 handle_call(Request, _From, OldState) ->
     ?log(1, {"router.unhandle_call:",{Request, _From, OldState}}),
     {reply, Request, OldState}. %{reply, Reply, State1}。Reply是需要回馈给客户端的答复，同时 State1 是gen_server的状态的新值。
@@ -207,16 +174,12 @@ handle_cast({update_router_item, NewRouterMap, KnownNodeList, Ref}, State) ->
                 State % ignore 已经处理过这个请求
         end,
     {noreply, NewState};
-%%handle_cast({update_router_info,NewRouterMap}, State) ->
-%%    NewState = update_router_info(State, NewRouterMap),
-%%    {noreply, NewState};
 
 handle_cast({log, {Level, What, Node, Pid, Module, Fun, Line, Time}}, State)->
     {ok, LevelThreshold} = get_config_from_state(?log_level, State),
     Level =< LevelThreshold andalso
         io:format("=> ~p~n"
                   "\t\t\t\t->log:~p N:~p P:~p M:~p:~p - ~p T:~s~n",[What, Level, Node, Pid, Module, Fun, Line, Time]),
-
     {noreply, State};
 
 handle_cast(stop, State) ->
