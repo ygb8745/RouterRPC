@@ -1,7 +1,41 @@
 -module(router).
 -behaviour(gen_server).
 
--compile(export_all).
+% API Function
+-export([
+    start_link/0,
+    stop/0,
+
+    % API for network
+    all_nodes/0,
+    get_path_to/1,
+    get_nodes_of_role/1,
+
+    % API for this node.
+    update_config/0,
+    update_config/2,
+    get_config/1,
+    set_role/1,
+    get_role/0,
+    set_log_level/1
+]).
+
+%% For gen_server
+-export([
+    init/1,
+    terminate/2,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    code_change/3
+]).
+
+%% For internal
+-export([
+    show/0,
+    help_process_loop/0,
+    find_path_for_all/1 % for test
+]).
 
 -include("router_def.hrl").
 

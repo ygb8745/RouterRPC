@@ -1,5 +1,14 @@
 -module(router_rpc).
--compile(export_all).
+
+-export([
+    call/4,
+    cast/4,
+    multicall/3,
+    multicall/4,
+    call_role/4,
+    echo/1,
+    tracert/1
+]).
 
 -include("router_def.hrl").
 
@@ -12,7 +21,7 @@ multicall(M,F,A)->
 multicall(Nodes,M,F,A)->
     [call(N,M,F,A) || N <- Nodes].
 
-role_call(Role,M,F,A)->
+call_role(Role,M,F,A)->
     Nodes = router:get_nodes_of_role(Role),
     [call(N,M,F,A) || N <- Nodes].
 
