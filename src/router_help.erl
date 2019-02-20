@@ -15,7 +15,7 @@ nl(Module)->
     lists:zip(AllNodes, ResultList).
 
 %   获取各个节点OPT版本信息:
-list_opt()->
+list_otp()->
     lists:foreach(
         fun(N)->
             io:format("~s\t ~s~n",[N, router_rpc:call(N, erlang, system_info, [system_version])])
